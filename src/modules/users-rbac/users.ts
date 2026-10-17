@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { rolePermissions, roles, userRoles, users } from "@/db/schema";
 import { recordAudit } from "@/modules/audit/service";
 import { parseLoginId } from "@/modules/auth/login-id";
-import { passwordPolicyError } from "@/modules/auth/policy";
+import { isLocked, passwordPolicyError } from "@/modules/auth/policy";
 import { revokeUserSessions, type SessionUser } from "@/modules/auth/sessions";
 import type { ServiceDeps } from "@/modules/shared/context";
 import type { DbOrTx, Tx } from "@/modules/shared/db";
@@ -24,7 +24,8 @@ export type UserListItem = {
   isOwner: boolean;
   isActive: boolean;
   mustChangePassword: boolean;
-  lockedUntil: Date | null;
+  /** Temporarily locked after failed logins (SEC-03), as of the listing time. */
+  locked: boolean;
   lastLoginAt: Date | null;
   roleIds: string[];
 };
@@ -105,7 +106,7 @@ function mapLoginConflict(error: unknown): never {
   throw error;
 }
 
-export async function listUsers(db: DbOrTx, actor: SessionUser): Promise<UserListItem[]> {
+export async function listUsers(db: DbOrTx, actor: SessionUser, now = new Date()): Promise<UserListItem[]> {
   assertAllowed(actor, "users.manage");
   const rows = await db
     .select({
@@ -132,7 +133,11 @@ export async function listUsers(db: DbOrTx, actor: SessionUser): Promise<UserLis
           ),
         )
     : [];
-  return rows.map((r) => ({ ...r, roleIds: assignments.filter((a) => a.userId === r.id).map((a) => a.roleId) }));
+  return rows.map(({ lockedUntil, ...r }) => ({
+    ...r,
+    locked: isLocked(lockedUntil, now),
+    roleIds: assignments.filter((a) => a.userId === r.id).map((a) => a.roleId),
+  }));
 }
 
 export type CreateUserInput = { name: string; login: string; tempPassword: string; roleIds: string[] };

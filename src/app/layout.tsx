@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
+import { DirectionProvider } from "@/components/direction-provider";
 import { t } from "@/lib/i18n";
 import "./globals.css";
 
@@ -18,7 +19,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ar" dir="rtl" className={`${plexArabic.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <DirectionProvider>{children}</DirectionProvider>
+      </body>
     </html>
   );
 }

@@ -3,33 +3,9 @@ import { auditLogs, users } from "@/db/schema";
 import type { SessionUser } from "@/modules/auth/sessions";
 import type { DbOrTx, Tx } from "@/modules/shared/db";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
+import type { AuditAction, AuditEntityType } from "./catalog";
 
-/** Every audited action (P1-07). Kept as a closed list so filters and labels stay in sync. */
-export const AUDIT_ACTIONS = [
-  "venue.setup",
-  "auth.login",
-  "auth.login_failed",
-  "auth.locked",
-  "auth.logout",
-  "auth.password_changed",
-  "users.create",
-  "users.update",
-  "users.activate",
-  "users.deactivate",
-  "users.password_reset",
-  "users.owner_granted",
-  "users.owner_renounced",
-  "support.owner_removed",
-  "support.owner_password_reset",
-  "roles.create",
-  "roles.update",
-  "roles.delete",
-] as const;
-
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
-
-export const AUDIT_ENTITY_TYPES = ["venue", "user", "role", "session"] as const;
-export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
+export { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, type AuditAction, type AuditEntityType } from "./catalog";
 
 export type AuditEntry = {
   venueId: string;
