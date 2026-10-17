@@ -29,12 +29,12 @@
 | booking_seq, receipt_seq | bigint | عدادات الترقيم (أو sequences منفصلة) |
 
 ### cancellation_tiers
-`id, venue_id, min_days_before int, refund_bps int (0–10000)`
-قيد فريد: `(venue_id, min_days_before)`.
+`id, venue_id, min_days_before int ≥ 0, refund_bps int (0–10000)`
+قيد فريد: `(venue_id, min_days_before)`. تُستبدل كمجموعة واحدة عند الحفظ، والنسبة لا تقل كلما زادت الأيام (BR-77، يُفحص في الكود). هذه السياسة **الحالية** للحجوزات التي ستتأكد؛ كل حجز مؤكد يحمل لقطته (D-68).
 
 ### seasons
 `id, venue_id, name, start_date date, end_date date, is_active`
-قيد: `start_date ≤ end_date` + Exclusion Constraint يمنع تداخل `daterange(start_date, end_date, '[]')` للمواسم النشطة في نفس المنشأة.
+قيد: `start_date ≤ end_date` + Exclusion Constraint `seasons_no_overlap` يمنع تداخل `daterange(start_date, end_date, '[]')` للمواسم النشطة في نفس المنشأة.
 
 ### event_types
 `id, venue_id, name, is_wedding bool, is_active, sort_order`
@@ -45,6 +45,8 @@
 ### expense_categories
 `id, venue_id, name, is_active`
 
+> **الأسماء فريدة** داخل كل قائمة إعدادية (هنا وفي `spaces`) على `(venue_id, lower(name))`، شاملة المعطّل (D-72).
+
 ## 2. الأماكن
 
 ### spaces
@@ -52,7 +54,7 @@
 
 ### space_slots
 `id, venue_id, space_id, kind enum(day, evening), start_time time, end_time time`
-قيد فريد: `(space_id, kind)`. يجوز `end_time < start_time` للدلالة على تخطي منتصف الليل.
+قيد فريد: `(space_id, kind)`. يجوز `end_time < start_time` للدلالة على تخطي منتصف الليل في الفترة المسائية فقط؛ النهارية `start_time < end_time` (D-69). لكل مكان الفترتان دائمًا (BR-01)، وفحص BR-02 بين الفترتين والوقت الفاصل في الكود مع قفل صف المنشأة.
 
 ## 3. الكتالوج والباكيجات
 
@@ -104,6 +106,8 @@
 | base_price, extra_guests_amount, items_total, removal_credits_total, discount_amount, total | bigint | لقطة السعر |
 | base_guests | int null | لقطة من الباكيج وقت التأكيد (D-35) |
 | extra_guest_price | bigint null | لقطة من الباكيج وقت التأكيد؛ تُستخدم لرد تخفيض المعازيم (D-35) |
+| cancellation_basis | enum(`deposit`,`total_paid`) null | لقطة سياسة الإلغاء وقت التأكيد (D-68) |
+| cancellation_tiers | jsonb null | لقطة الشرائح وقت التأكيد: `[{min_days_before, refund_bps}]` (D-68)؛ تُطبع في العقد ويُحسب بها الإلغاء (BR-71، BR-72) |
 | cancelled_at, cancelled_by, cancel_reason | | |
 | confirmed_at, confirmed_by | | |
 | notes | text null | |
