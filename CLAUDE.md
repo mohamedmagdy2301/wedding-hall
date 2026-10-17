@@ -40,6 +40,7 @@ Next.js (App Router) + TypeScript strict · Tailwind (RTL) · Zod · Drizzle ORM
 - التقارير لمالك المنتج بالعربي (عامية مصرية واضحة).
 - `git push` فقط بعد موافقة مالك المنتج على commits المرحلة أو بطلب صريح منه.
 - أي أمر يحتاج إدخال قيمة سر (مثل `wrangler secret put`) يشغّله مالك المنتج بنفسه؛ قدّم له الأمر فقط.
+- النشر على Worker التطوير (`wedding-hall` على `workers.dev`) مسموح لـ Claude Code بـ `npm run deploy` أو `npx opennextjs-cloudflare deploy`. **أي نشر لمنشأة حقيقية يحتاج موافقة صريحة من مالك المنتج في كل مرة.**
 - ممنوع قراءة ملفات `.env*` و `.dev.vars` (قاعدة صلاحيات محلية)؛ استخدم `npm run env:check` و `npm run db:info`.
 
 ## الأوامر
