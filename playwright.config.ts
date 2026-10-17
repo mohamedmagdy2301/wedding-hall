@@ -8,6 +8,9 @@ const externalBaseUrl = process.env.E2E_BASE_URL;
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
+  // One venue per database: files run one after another, so a phase's journey never sees
+  // another phase's data appear halfway (phase 2 asserts the initial "missing" steps).
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",

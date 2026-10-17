@@ -6,6 +6,8 @@ export const SETTINGS_TABS = [
   { key: "spaces", href: "/settings/spaces", requires: "catalog.manage" },
   { key: "timing", href: "/settings/timing", requires: "settings.manage" },
   { key: "seasons", href: "/settings/seasons", requires: "catalog.manage" },
+  { key: "services", href: "/settings/services", requires: "catalog.manage" },
+  { key: "packages", href: "/settings/packages", requires: "catalog.manage" },
   { key: "eventTypes", href: "/settings/event-types", requires: "settings.manage" },
   { key: "paymentMethods", href: "/settings/payment-methods", requires: "settings.manage" },
   { key: "policies", href: "/settings/policies", requires: "settings.manage" },

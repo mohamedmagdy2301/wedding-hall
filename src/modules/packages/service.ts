@@ -97,6 +97,9 @@ async function readPackage(db: DbOrTx, venueId: string, packageId: string, lock 
   return { ...row, prices: pricesOf(children.prices, packageId), items: itemsOf(children.items, packageId) };
 }
 
+export type PackageListRow = Awaited<ReturnType<typeof listPackages>>[number];
+export type PackageFormOptions = Awaited<ReturnType<typeof formOptions>>;
+
 /** S-13 list: every package with its space, bookable slots (D-56) and prices. */
 export async function listPackages(db: DbOrTx, actor: SessionUser) {
   assertAllowed(actor, "catalog.manage");

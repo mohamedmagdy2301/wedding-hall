@@ -1,9 +1,11 @@
 import "server-only";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { cache } from "react";
 import { getDb } from "@/db/request";
 import { listAudit, listAuditActors, type AuditFilters } from "@/modules/audit/service";
+import { listServices } from "@/modules/catalog/services";
+import { getNewPackageOptions, getPackage, listPackages } from "@/modules/packages/service";
 import { resolveSession, type SessionUser } from "@/modules/auth/sessions";
 import { getSetupChecklist } from "@/modules/settings/checklist";
 import { listItems } from "@/modules/settings/lists";
@@ -15,6 +17,8 @@ import { listSpaces } from "@/modules/spaces/service";
 import { satisfies, type Requirement } from "@/modules/users-rbac/authorize";
 import { listRoles } from "@/modules/users-rbac/roles";
 import { listUsers } from "@/modules/users-rbac/users";
+import { AppError } from "@/modules/shared/errors";
+import { id as uuidField } from "@/modules/shared/fields";
 import { readSessionToken } from "./session-cookie";
 
 /**
@@ -97,6 +101,33 @@ export async function getSpacesPageData() {
 export async function getSeasonsPageData() {
   const actor = await requireAccess("catalog.manage");
   return { seasons: await listSeasons(getDb(), actor) };
+}
+
+export async function getServicesPageData() {
+  const actor = await requireAccess("catalog.manage");
+  return { services: await listServices(getDb(), actor) };
+}
+
+export async function getPackagesPageData() {
+  const actor = await requireAccess("catalog.manage");
+  return { packages: await listPackages(getDb(), actor) };
+}
+
+export async function getNewPackagePageData() {
+  const actor = await requireAccess("catalog.manage");
+  return getNewPackageOptions(getDb(), actor);
+}
+
+/** The package edit page, opened on the current `version` (D-81). Unknown ids are a 404. */
+export async function getPackagePageData(packageId: string) {
+  const actor = await requireAccess("catalog.manage");
+  if (!uuidField.safeParse(packageId).success) notFound();
+  try {
+    return await getPackage(getDb(), actor, packageId);
+  } catch (error) {
+    if (error instanceof AppError && error.code === "NOT_FOUND") notFound();
+    throw error;
+  }
 }
 
 export async function getListPageData(kind: ListKind) {

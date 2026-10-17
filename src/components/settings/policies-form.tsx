@@ -1,14 +1,14 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { ConfirmDialog } from "@/components/forms/confirm-dialog";
 import { Field, FormError } from "@/components/forms/field";
+import { SelectField } from "@/components/forms/select-field";
 import { useServerAction } from "@/components/forms/use-server-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { refundsNothing, tierFor } from "@/domain/cancellation-tiers";
 import { bpsToInput, formatBps, parsePercent, piastersToInput } from "@/domain/money";
 import { toAsciiDigits } from "@/lib/digits";
@@ -20,33 +20,6 @@ import { useSavedNote } from "./saved-note";
 type TierRow = { key: number; minDaysBefore: string; refund: string };
 
 const tp = t.settings.policies;
-
-function SelectField<V extends string>(props: {
-  label: string;
-  value: V;
-  onChange: (value: V) => void;
-  options: Record<V, string>;
-  testId: string;
-}) {
-  const id = useId();
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{props.label}</Label>
-      <Select value={props.value} onValueChange={(v) => props.onChange(v as V)}>
-        <SelectTrigger id={id} className="w-full sm:w-72" data-testid={props.testId}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {(Object.keys(props.options) as V[]).map((key) => (
-            <SelectItem key={key} value={key}>
-              {props.options[key]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
 
 /** S-13 "السياسات": D-19 (deposit), D-20 + BR-77 (tiers and basis), D-22 (postpone credit). */
 export function PoliciesForm({ settings }: { settings: VenueSettings }) {

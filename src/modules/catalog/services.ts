@@ -55,7 +55,9 @@ async function packageCounts(db: DbOrTx, venueId: string) {
   return new Map(rows.map((r) => [r.serviceId, r.n]));
 }
 
-export async function listServices(db: DbOrTx, actor: SessionUser) {
+export type ServiceRow = Service & { packageCount: number };
+
+export async function listServices(db: DbOrTx, actor: SessionUser): Promise<ServiceRow[]> {
   assertAllowed(actor, "catalog.manage");
   const [rows, counts] = await Promise.all([readServices(db, actor.venueId), packageCounts(db, actor.venueId)]);
   return rows.map((s) => ({ ...s, packageCount: counts.get(s.id) ?? 0 }));

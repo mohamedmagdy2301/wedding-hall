@@ -12,7 +12,8 @@ export function SettingsNav({ tabs }: { tabs: { key: SettingsTabKey; href: strin
   return (
     <nav aria-label={t.settings.title} className="flex gap-1 overflow-x-auto border-b pb-2">
       {tabs.map((tab) => {
-        const current = pathname === tab.href;
+        // A package's own page (/settings/packages/…) stays under its tab.
+        const current = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
           <Link
             key={tab.key}
