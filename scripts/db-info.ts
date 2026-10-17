@@ -20,6 +20,12 @@ async function main() {
     console.log("databases:  ", databases.rows.map((r) => r.datname).join(", "));
     console.log("extensions: ", extensions.rows.map((r) => `${r.extname} ${r.extversion}`).join(", "));
     console.log("tables:     ", tables.rows.map((r) => r.table_name).join(", ") || "(none)");
+    // Row counts only (no data) for the tables setup cares about.
+    const names = new Set(tables.rows.map((r) => r.table_name));
+    for (const table of ["venues", "users", "roles"].filter((t) => names.has(t))) {
+      const { rows } = await client.query<{ n: number }>(`select count(*)::int as n from ${table}`);
+      console.log(`rows ${table}:`.padEnd(13), rows[0].n);
+    }
   } finally {
     await client.end();
   }

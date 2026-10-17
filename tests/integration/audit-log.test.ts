@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditLogs, roles, users } from "@/db/schema";
+import { auditLogs, roles, users, venues } from "@/db/schema";
 import { listAudit, recordAudit } from "@/modules/audit/service";
 import { setupVenue } from "@/modules/settings/setup";
 import { DEFAULT_ROLES } from "@/modules/users-rbac/permissions";
@@ -60,6 +60,16 @@ describe("audit log", () => {
     };
     await setupVenue(deps, input);
 
+    const [venue] = await handle.db.select().from(venues);
+    expect(venue).toMatchObject({
+      name: "قاعة",
+      bufferMinutes: 60,
+      tentativeHoldHours: 48,
+      minDepositType: "none",
+      minDepositValue: 0,
+      cancellationBasis: "deposit",
+      postponeCreditMode: "refund",
+    });
     const [owner] = await handle.db.select().from(users);
     expect(owner.login).toBe("owner.main");
     expect(owner.isOwner && owner.mustChangePassword && owner.isActive).toBe(true);
