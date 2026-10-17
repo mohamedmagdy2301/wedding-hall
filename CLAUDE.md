@@ -56,7 +56,7 @@ Next.js (App Router) + TypeScript strict · Tailwind (RTL) · Zod · Drizzle ORM
 | `npm run test:e2e` | Playwright (كمبيوتر + موبايل)؛ `E2E_BASE_URL=<url>` لاختبار نسخة قائمة |
 | `npm run db:generate` | توليد Migration من المخطط (drizzle-kit) |
 | `npm run db:migrate` | تطبيق الـ Migrations (`DATABASE_URL_UNPOOLED`) |
-| `npm run db:seed` | منشأة تجريبية للتطوير فقط (مالك `owner`، كلمة مؤقتة تُكتب مخفية) |
+| `npm run db:seed` | منشأة تجريبية للتطوير فقط (مالك `owner`، كلمة مؤقتة تُكتب مخفية) بإعدادات تجريبية؛ `-- --bare` بلا إعدادات لتجربة القائمة الموجّهة |
 | `npm run db:info` | إصدار القاعدة وأسماء الجداول والامتدادات وعدد صفوف venues/users/roles (بلا أسرار) |
 | `npm run env:check` | أسماء المفاتيح و set/missing فقط |
 | `npm run cf:build` | بناء الـ Worker مع حارس الأسرار وحارس معاملات التشفير (D-65) قبل البناء وبعده |
@@ -69,8 +69,8 @@ Next.js (App Router) + TypeScript strict · Tailwind (RTL) · Zod · Drizzle ORM
 > السكريبتات تشفّر بمعاملات OWASP افتراضيًا. لقاعدة Worker التطوير (الخطة المجانية) ضع `APP_ENV=development` والمعاملات الخفيفة في متغيرات البيئة للأمر نفسه (D-65).
 
 ## حالة المشروع
-- **المرحلة الحالية:** المرحلة 1 **مقفولة** بموافقة مالك المنتج (2026-10-17) — التقرير في `docs/phases/PHASE1_REPORT.md`. **المرحلة 2 (الإعدادات) قيد التنفيذ:** الخطة معتمدة في `docs/phases/PHASE2_PLAN.md` (القرارات D-66..D-73).
-- **ما اكتمل:** المرحلة 0 (الهيكل، RTL، Drizzle، الاختبارات، CI، النشر على `wedding-hall.email13579test-7ee.workers.dev`، `docs/spikes/PHASE0.md`). المرحلة 1: تشفير Argon2id (D-64/D-65، `docs/spikes/PHASE1_HASHING.md`)، الدخول والقفل والجلسات وتغيير كلمة المرور، الموظفون والأدوار والملاك (BR-100..102، P1-11)، سجل العمليات append-only، غلاف الـ Server Actions الموحد، سكريبتات الإعداد والدعم الفني، الشاشات S-01 و S-02 و S-15 و S-16 بـ shadcn/ui (RTL). Migration `0002` مطبقة على قاعدة Neon التطوير.
+- **المرحلة الحالية:** المرحلة 1 **مقفولة** بموافقة مالك المنتج (2026-10-17) — التقرير في `docs/phases/PHASE1_REPORT.md`. **المرحلة 2 (الإعدادات) منفذة وبانتظار مراجعة وموافقة مالك المنتج** (2026-10-18) — التقرير في `docs/phases/PHASE2_REPORT.md`. لا تبدأ المرحلة 3 قبل الموافقة.
+- **ما اكتمل:** المرحلة 0 (الهيكل، RTL، Drizzle، الاختبارات، CI، النشر على `wedding-hall.email13579test-7ee.workers.dev`، `docs/spikes/PHASE0.md`). المرحلة 1: تشفير Argon2id (D-64/D-65، `docs/spikes/PHASE1_HASHING.md`)، الدخول والقفل والجلسات وتغيير كلمة المرور، الموظفون والأدوار والملاك (BR-100..102، P1-11)، سجل العمليات append-only، غلاف الـ Server Actions الموحد، سكريبتات الإعداد والدعم الفني، الشاشات S-01 و S-02 و S-15 و S-16 بـ shadcn/ui (RTL). المرحلة 2: الأماكن والفترات (BR-01/02 مع قفل صف المنشأة)، المواسم (`seasons_no_overlap`)، القوائم الثلاث، السياسات وشرائح الإلغاء (BR-77)، دوال `src/domain/` (money، slots، seasons، cancellation-tiers، setup-checklist)، الشاشتان S-13 و S-14. Migration `0003` مطبقة على قاعدة Neon التطوير.
 - **ملاحظات مفتوحة:**
   - الإنتاج يحتاج ترقية الحساب لـ Workers Paid قبل أول منشأة حقيقية (D-57)، وتأكيد شروط Neon التجارية (D-59) — المرحلة 12.
   - إعادة قياس التشفير على Workers Paid بالإعدادات النهائية قبل أول قاعة (المرحلة 12، D-64).
