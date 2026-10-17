@@ -37,6 +37,20 @@ export function parsePercent(input: string): number | null {
   return bps <= MAX_BPS ? bps : null;
 }
 
+/**
+ * `bps` of `amount`, rounded once to the nearest piaster, half up (BR-36, D-43). The only
+ * rounding in the project (D-96): the pricing formula has no percentages; the minimum
+ * deposit (phase 6) and refunds (phase 8) use this. Integer arithmetic only:
+ * MAX_PIASTERS × MAX_BPS stays inside Number.MAX_SAFE_INTEGER.
+ */
+export function applyBps(amount: number, bps: number): number {
+  if (!Number.isSafeInteger(amount) || amount < 0 || amount > MAX_PIASTERS) {
+    throw new RangeError(`invalid amount: ${amount}`);
+  }
+  if (!Number.isInteger(bps) || bps < 0 || bps > MAX_BPS) throw new RangeError(`invalid bps: ${bps}`);
+  return Math.floor((amount * bps + MAX_BPS / 2) / MAX_BPS);
+}
+
 const groupFormat = new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 });
 const arabicDigits = (ascii: string) => ascii.replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
 

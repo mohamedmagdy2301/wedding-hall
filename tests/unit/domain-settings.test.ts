@@ -7,6 +7,7 @@ import {
   type CancellationTier,
 } from "@/domain/cancellation-tiers";
 import {
+  applyBps,
   bpsToInput,
   formatBps,
   formatPiasters,
@@ -65,6 +66,33 @@ describe("money (BR-36)", () => {
     expect(bpsToInput(1250)).toBe("12.5");
     expect(bpsToInput(1225)).toBe("12.25");
     expect(parsePounds(piastersToInput(123456))).toBe(123456);
+  });
+});
+
+describe("applyBps: rounding half up, once (BR-36, D-43, D-96)", () => {
+  it.each([
+    ["R-01", 1_234_567, 1250, 154_321], // 154,320.875
+    ["R-02", 1, 5000, 1], // 0.5 → up
+    ["R-03", 3, 5000, 2], // 1.5 → up
+    ["R-04", 101, 5000, 51], // 50.5 → up
+    ["R-05", 1_000_001, 2500, 250_000], // 250,000.25 → down
+    ["R-06", 999, 3333, 333], // 332.9667 → up
+    ["R-07", 6_000_000, 0, 0],
+    ["R-07", 6_000_000, 10_000, 6_000_000],
+    ["R-08", 100_000_000_000, 10_000, 100_000_000_000], // MAX_PIASTERS, no overflow
+  ])("%s: %i × %i bps = %i piasters", (_case, amount, bps, expected) => {
+    expect(applyBps(amount, bps)).toBe(expected);
+  });
+
+  it.each([
+    [-1, 1000],
+    [0.5, 1000],
+    [MAX_PIASTERS + 1, 1000],
+    [1000, -1],
+    [1000, 10_001],
+    [1000, 12.5],
+  ])("R-09: rejects amount %d with %d bps", (amount, bps) => {
+    expect(() => applyBps(amount, bps)).toThrow(RangeError);
   });
 });
 
