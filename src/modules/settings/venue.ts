@@ -85,6 +85,16 @@ export async function allSpaceSlots(
   return [...bySpace].flatMap(([spaceId, s]) => (s.day && s.evening ? [{ spaceId, slots: s as SpaceSlotTimes }] : []));
 }
 
+/** The buffer and hold for screens of other permissions (spaces need the buffer, `catalog.manage`). */
+export async function getTiming(db: DbOrTx, venueId: string) {
+  const [venue] = await db
+    .select({ bufferMinutes: venues.bufferMinutes, tentativeHoldHours: venues.tentativeHoldHours })
+    .from(venues)
+    .where(eq(venues.id, venueId));
+  if (!venue) throw new AppError("NOT_FOUND", "venueNotSetUp");
+  return venue;
+}
+
 /** S-13 (`settings.manage`): venue data, timing and policies with the current tiers. */
 export async function getVenueSettings(db: DbOrTx, actor: SessionUser) {
   assertAllowed(actor, "settings.manage");

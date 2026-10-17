@@ -1,10 +1,5 @@
 import { createSpace, moveSpace, setSpaceActive, updateSpace } from "@/modules/spaces/service";
-import {
-  createSpaceSchema,
-  moveSpaceSchema,
-  setSpaceActiveSchema,
-  updateSpaceSchema,
-} from "@/modules/spaces/schemas";
+import { createSpaceSchema, moveSpaceSchema, setSpaceActiveSchema, updateSpaceSchema } from "@/modules/spaces/schemas";
 import { defineProtected } from "./define";
 
 /** S-13 "الأماكن والفترات" (API.md "Catalog", `catalog.manage`). */

@@ -19,20 +19,27 @@ import { cn } from "@/lib/utils";
 import { logoutAction } from "@/server/actions/auth";
 import type { CurrentUserView } from "@/server/dal";
 
-type NavItem = { href: string; label: string; permission?: string };
+/** `permissions`: shown when the user holds any of them. */
+type NavItem = { href: string; label: string; permissions?: string[] };
 
 const NAV: NavItem[] = [
   { href: "/", label: t.shell.home },
-  { href: "/staff", label: t.shell.staff, permission: "users.manage" },
-  { href: "/audit", label: t.shell.audit, permission: "audit.view" },
+  { href: "/settings", label: t.shell.settings, permissions: ["settings.manage", "catalog.manage"] },
+  { href: "/staff", label: t.shell.staff, permissions: ["users.manage"] },
+  { href: "/audit", label: t.shell.audit, permissions: ["audit.view"] },
 ];
+
+const isCurrent = (pathname: string, href: string) =>
+  href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
 /** Hides links the user cannot open — convenience only; every page checks on the server (SEC-10). */
 export function AppHeader({ user, venueName }: { user: CurrentUserView; venueName: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const items = NAV.filter((item) => !item.permission || user.isOwner || user.permissions.includes(item.permission));
+  const items = NAV.filter(
+    (item) => !item.permissions || user.isOwner || item.permissions.some((p) => user.permissions.includes(p)),
+  );
 
   function logout() {
     startTransition(async () => {
@@ -53,10 +60,10 @@ export function AppHeader({ user, venueName }: { user: CurrentUserView; venueNam
             <Link
               key={item.href}
               href={item.href}
-              aria-current={pathname === item.href ? "page" : undefined}
+              aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:bg-muted hover:text-foreground",
-                pathname === item.href && "bg-muted font-medium text-foreground",
+                isCurrent(pathname, item.href) && "bg-muted font-medium text-foreground",
               )}
             >
               {item.label}
