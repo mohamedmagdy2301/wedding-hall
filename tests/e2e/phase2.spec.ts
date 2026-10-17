@@ -71,12 +71,28 @@ test("the owner's guided setup shows what is missing and fills up as they config
 
   // Cancellation tiers (mandatory, D-67) with the live example (BR-71).
   await page.getByRole("link", { name: "السياسات" }).click();
+  // D-74: saving the ready "0 days: 0%" tier alone asks for an explicit confirmation.
+  await page.getByRole("button", { name: "حفظ" }).click();
+  const noRefund = page.getByRole("dialog");
+  await expect(noRefund).toContainText("العميل مش هيسترد أي مبلغ عند الإلغاء في أي وقت. متأكد؟");
+  await noRefund.getByRole("button", { name: "إلغاء" }).click();
+  await expect(noRefund).toBeHidden();
+  await expect(page.getByTestId("saved-note")).toHaveText("");
+  await page.getByRole("button", { name: "حفظ" }).click();
+  await noRefund.getByRole("button", { name: "متأكد، احفظ" }).click();
+  await expect(noRefund).toBeHidden();
+  await expect(page.getByTestId("saved-note")).toHaveText("تم الحفظ.");
+  // With a tier above 0% there is nothing to confirm.
   await page.getByRole("button", { name: "إضافة شريحة" }).click();
   await page.getByTestId("tier-1").getByLabel("قبل الحفلة بـ (يوم) أو أكثر").fill("30");
   await page.getByTestId("tier-1").getByLabel("يُرد (%)").fill("50");
   await expect(page.getByTestId("tier-preview")).toContainText("٥٠٪");
   await page.getByRole("button", { name: "حفظ" }).click();
-  await expect(page.getByTestId("saved-note")).toHaveText("تم الحفظ.");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.reload();
+  // Shown with the most days first.
+  await expect(page.getByTestId("tier-0").getByLabel("قبل الحفلة بـ (يوم) أو أكثر")).toHaveValue("30");
+  await expect(page.getByTestId("tier-0").getByLabel("يُرد (%)")).toHaveValue("50");
 
   // Event types from the suggested list, and one payment method by hand.
   await page.getByRole("link", { name: "أنواع المناسبات" }).click();

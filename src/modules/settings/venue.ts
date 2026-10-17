@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { cancellationTiers, spaces, spaceSlots, venues } from "@/db/schema";
-import { sortTiers, tierViolation, type CancellationTier } from "@/domain/cancellation-tiers";
+import { refundsNothing, sortTiers, tierViolation, type CancellationTier } from "@/domain/cancellation-tiers";
 import { maxBufferFor, slotViolations, toHhMm, type SpaceSlotTimes } from "@/domain/slots";
 import { recordAudit } from "@/modules/audit/service";
 import type { SessionUser } from "@/modules/auth/sessions";
@@ -164,6 +164,7 @@ export type UpdatePoliciesInput = {
   cancellationBasis: "deposit" | "total_paid";
   postponeCreditMode: "refund" | "services" | "both";
   tiers: CancellationTier[];
+  confirmNoRefund?: boolean;
 };
 
 /**
@@ -175,6 +176,10 @@ export async function updatePolicies(deps: ServiceDeps, actor: SessionUser, inpu
   const violation = tierViolation(input.tiers);
   if (violation) {
     throw new AppError("BUSINESS_RULE_VIOLATION", violation, { rule: "BR-77", fieldErrors: { tiers: violation } });
+  }
+  // D-60 / D-74: a policy that never refunds anything is a conscious decision, not a default.
+  if (refundsNothing(input.tiers) && input.confirmNoRefund !== true) {
+    throw new AppError("BUSINESS_RULE_VIOLATION", "noRefundNeedsConfirmation", { rule: "BR-77" });
   }
   const tiers = sortTiers(input.tiers);
   const venueFields = {

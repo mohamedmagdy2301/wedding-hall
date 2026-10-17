@@ -132,11 +132,37 @@ describe("settings and spaces (phase 2)", () => {
           minDepositType: "fixed",
           minDepositValue: "2,500.50",
           tiers: [{ minDaysBefore: "0", refundBps: "0" }],
+          confirmNoRefund: true,
         }),
       );
       const settings = await getVenueSettings(handle.db, owner.actor);
       expect(settings).toMatchObject({ minDepositType: "fixed", minDepositValue: 250050, postponeCreditMode: "both" });
       expect(settings.tiers).toEqual([{ minDaysBefore: 0, refundBps: 0 }]);
+    });
+
+    it("D-74: a policy where every tier is 0% is saved only with explicit confirmation", async () => {
+      const { owner } = await scenario();
+      const noRefund = {
+        ...policies,
+        tiers: [
+          { minDaysBefore: "0", refundBps: "0" },
+          { minDaysBefore: "60", refundBps: "0" },
+        ],
+      };
+      expect(await callSpec(handle, settingsSpecs.updatePolicies, owner.token, noRefund)).toMatchObject({
+        ok: false,
+        error: { code: "BUSINESS_RULE_VIOLATION", message: expect.stringContaining("أكّد") },
+      });
+      expect(
+        await callSpec(handle, settingsSpecs.updatePolicies, owner.token, { ...noRefund, confirmNoRefund: false }),
+      ).toMatchObject({ ok: false });
+      expect(await handle.db.select().from(cancellationTiers)).toHaveLength(0);
+      expect(await auditActions(handle)).not.toContain("settings.policies_updated");
+
+      ok(await callSpec(handle, settingsSpecs.updatePolicies, owner.token, { ...noRefund, confirmNoRefund: true }));
+      expect((await getVenueSettings(handle.db, owner.actor)).tiers).toHaveLength(2);
+      // Any tier above 0% needs no confirmation.
+      ok(await callSpec(handle, settingsSpecs.updatePolicies, owner.token, policies));
     });
 
     it("BR-77 / D-67: refuses no tiers, a decreasing refund, and a 0 deposit; nothing is changed", async () => {

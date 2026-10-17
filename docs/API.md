@@ -16,7 +16,7 @@
 `users.list`, `users.create(name, login, tempPassword, roleIds)`, `users.update`, `users.setActive`, `users.resetPassword`, `roles.list`, `roles.create(name, permissionKeys)`, `roles.update`, `roles.delete` (ممنوع إن كان مستخدمًا).
 
 ## Settings — `settings.manage`
-`settings.get`, `settings.updateVenue(name, phone, address)`, `settings.updateTiming(bufferMinutes, tentativeHoldHours)` (يُرفض إن كسر BR-02 في أي مكان — D-51)، `settings.updatePolicies(minDeposit, cancellationBasis, tiers[], postponeCreditMode)` (D-73)، إضافة/تعديل/تفعيل/تعطيل/ترتيب لـ `eventTypes`, `paymentMethods`, `expenseCategories` مع `addSuggested` (D-71)، و `setup.checklist` (للمالك).
+`settings.get`, `settings.updateVenue(name, phone, address)`, `settings.updateTiming(bufferMinutes, tentativeHoldHours)` (يُرفض إن كسر BR-02 في أي مكان — D-51)، `settings.updatePolicies(minDeposit, cancellationBasis, tiers[], postponeCreditMode, confirmNoRefund?)` (D-73؛ `confirmNoRefund` مطلوب إن كانت كل الشرائح 0% — D-74)، إضافة/تعديل/تفعيل/تعطيل/ترتيب لـ `eventTypes`, `paymentMethods`, `expenseCategories` مع `addSuggested` (D-71)، و `setup.checklist` (للمالك).
 
 ## Catalog — `catalog.manage`
 CRUD لـ `spaces` (مع `slots`)، `seasons` (D-66)، `services`، `packages` (مع `prices[]` و `items[]`). لا حذف: التعطيل بـ `is_active`.

@@ -40,6 +40,8 @@ export const updatePoliciesSchema = z
     cancellationBasis: z.enum(["deposit", "total_paid"]),
     postponeCreditMode: z.enum(["refund", "services", "both"]),
     tiers: z.array(tierSchema).max(MAX_TIERS, "tooManyTiers"),
+    /** Required when every tier is 0% (D-74). */
+    confirmNoRefund: z.boolean().optional(),
   })
   .transform((input, ctx) => {
     let minDepositValue = 0;

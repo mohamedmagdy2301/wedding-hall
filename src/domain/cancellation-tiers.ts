@@ -37,6 +37,10 @@ export function tierViolation(tiers: readonly CancellationTier[]): TierViolation
 
 export const tiersConfigured = (tiers: readonly CancellationTier[]) => tiers.length > 0;
 
+/** Every tier refunds 0%: the customer never gets anything back, so saving needs explicit confirmation (D-74). */
+export const refundsNothing = (tiers: readonly CancellationTier[]) =>
+  tiers.length > 0 && tiers.every((t) => t.refundBps === 0);
+
 /**
  * BR-71: the tier with the largest `minDaysBefore` ≤ the days remaining; none → 0%.
  * In phase 8 it is applied to the booking's snapshot (D-68); here it drives the policy preview.

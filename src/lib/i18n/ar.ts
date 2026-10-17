@@ -150,6 +150,9 @@ export const ar = {
       previewNone: "لا توجد شريحة مطابقة: لا يُرد شيء.",
       postpone: "تسوية فرق التأجيل لصالح العميل",
       postponeMode: "طريقة التسوية",
+      noRefundTitle: "لا يوجد استرداد في أي وقت",
+      noRefundDescription: "السياسة دي معناها إن العميل مش هيسترد أي مبلغ عند الإلغاء في أي وقت. متأكد؟",
+      noRefundConfirm: "متأكد، احفظ",
       postponeModes: {
         refund: "استرداد نقدي",
         services: "رصيد يُخصم من خدمات تضاف للحجز",
@@ -422,6 +425,7 @@ export const ar = {
       tierOutOfRange: "أيام الشريحة من 0 إلى 730، ونسبتها من 0% إلى 100%.",
       tierDaysDuplicate: "لا تتكرر نفس عدد الأيام في شريحتين.",
       tierOrder: "نسبة الاسترداد لا تقل كلما زادت الأيام قبل الحفلة (BR-77).",
+      noRefundNeedsConfirmation: "كل الشرائح نسبتها 0%: أكّد إن العميل مش هيسترد أي مبلغ عند الإلغاء.",
     },
   },
 } as const;

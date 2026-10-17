@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { tierFor, tierViolation, tiersConfigured, type CancellationTier } from "@/domain/cancellation-tiers";
+import {
+  refundsNothing,
+  tierFor,
+  tierViolation,
+  tiersConfigured,
+  type CancellationTier,
+} from "@/domain/cancellation-tiers";
 import {
   bpsToInput,
   formatBps,
@@ -193,6 +199,18 @@ describe("cancellation tiers (BR-71, BR-77, D-67)", () => {
         { minDaysBefore: 30, refundBps: 5000 },
       ]),
     ).toBeNull();
+  });
+
+  it("D-74: a policy where every tier is 0% refunds nothing and needs explicit confirmation", () => {
+    expect(refundsNothing([{ minDaysBefore: 0, refundBps: 0 }])).toBe(true);
+    expect(
+      refundsNothing([
+        { minDaysBefore: 0, refundBps: 0 },
+        { minDaysBefore: 60, refundBps: 0 },
+      ]),
+    ).toBe(true);
+    expect(refundsNothing(policy)).toBe(false);
+    expect(refundsNothing([])).toBe(false);
   });
 
   it("BR-71: the tier with the largest day count not above the days remaining; none → no tier", () => {

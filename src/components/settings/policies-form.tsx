@@ -2,13 +2,14 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
+import { ConfirmDialog } from "@/components/forms/confirm-dialog";
 import { Field, FormError } from "@/components/forms/field";
 import { useServerAction } from "@/components/forms/use-server-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { tierFor } from "@/domain/cancellation-tiers";
+import { refundsNothing, tierFor } from "@/domain/cancellation-tiers";
 import { bpsToInput, formatBps, parsePercent, piastersToInput } from "@/domain/money";
 import { toAsciiDigits } from "@/lib/digits";
 import { t } from "@/lib/i18n";
@@ -70,6 +71,7 @@ export function PoliciesForm({ settings }: { settings: VenueSettings }) {
       : [{ key: 0, minDaysBefore: "0", refund: "0" }],
   );
   const [previewDays, setPreviewDays] = useState("45");
+  const [confirmingNoRefund, setConfirmingNoRefund] = useState(false);
 
   const updateTier = (key: number, patch: Partial<TierRow>) =>
     setTiers((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -79,8 +81,7 @@ export function PoliciesForm({ settings }: { settings: VenueSettings }) {
     setNextKey((k) => k + 1);
   }
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function submit(confirmNoRefund: boolean) {
     run(
       {
         minDepositType: depositType,
@@ -88,9 +89,20 @@ export function PoliciesForm({ settings }: { settings: VenueSettings }) {
         cancellationBasis: basis,
         postponeCreditMode: postpone,
         tiers: tiers.map((row) => ({ minDaysBefore: row.minDaysBefore, refundBps: row.refund })),
+        confirmNoRefund,
       },
-      saved.flash,
+      () => {
+        setConfirmingNoRefund(false);
+        saved.flash();
+      },
     );
+  }
+
+  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // D-74: a policy that never refunds is confirmed explicitly (the server requires it too).
+    if (parsedTiers.length === tiers.length && refundsNothing(parsedTiers)) setConfirmingNoRefund(true);
+    else submit(false);
   }
 
   // Live example of the tiers as typed (BR-71), so the owner sees what the numbers mean.
@@ -109,7 +121,7 @@ export function PoliciesForm({ settings }: { settings: VenueSettings }) {
 
   return (
     <form onSubmit={onSubmit} className="grid max-w-3xl gap-8" noValidate>
-      <FormError error={error?.fieldErrors ? null : error} />
+      <FormError error={error?.fieldErrors || confirmingNoRefund ? null : error} />
 
       <fieldset className="grid gap-3">
         <legend className="mb-2 text-lg font-semibold">{tp.deposit}</legend>
@@ -228,6 +240,17 @@ export function PoliciesForm({ settings }: { settings: VenueSettings }) {
       </fieldset>
 
       <p className="text-xs text-muted-foreground">{tp.snapshotNote}</p>
+      <ConfirmDialog
+        open={confirmingNoRefund}
+        onOpenChange={setConfirmingNoRefund}
+        title={tp.noRefundTitle}
+        description={tp.noRefundDescription}
+        confirmLabel={tp.noRefundConfirm}
+        destructive
+        pending={pending}
+        error={confirmingNoRefund ? error : null}
+        onConfirm={() => submit(true)}
+      />
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? t.common.saving : t.common.save}
