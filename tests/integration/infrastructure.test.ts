@@ -6,11 +6,11 @@ describe("database infrastructure", () => {
   const handle = connectTestDb();
   afterAll(() => handle.close());
 
-  it("runs PostgreSQL 17", async () => {
+  it("runs PostgreSQL 18, matching the Neon project", async () => {
     const result = await handle.db.execute<{ version: string }>(
       sql`select current_setting('server_version') as version`,
     );
-    expect(result.rows[0].version).toMatch(/^17\./);
+    expect(result.rows[0].version).toMatch(/^18\./);
   });
 
   it("has btree_gist enabled by the first migration (A-04, BR-11 prerequisite)", async () => {

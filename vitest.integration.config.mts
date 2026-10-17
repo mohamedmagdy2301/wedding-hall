@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-// Integration tests run against a real PostgreSQL 17 (docker compose), never mocks.
+// Integration tests run against a real PostgreSQL 18 (docker compose), never mocks.
 export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },

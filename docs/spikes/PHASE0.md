@@ -10,7 +10,7 @@
 | A-01 | شروط الخطط المجانية | ✅ مع ملاحظتين | Neon لا يذكر صراحة السماح بالاستخدام التجاري على الخطة المجانية، وتفعيل R2 غالبًا يحتاج كارت (انظر التفاصيل) |
 | A-02 | Next.js على Workers + Server Action تقرأ من القاعدة | ✅ محليًا على workerd — ⏳ النشر الفعلي | تطلّب تعطيل Cache Components (انظر "انحرافات") |
 | A-03 | تشفير كلمة المرور داخل حدود Workers المجانية | ⚠️ مؤشر سلبي محليًا — ⏳ القياس الفعلي | PBKDF2 بـ 100 ألف تكرار ≈ 28 مللي ثانية CPU محليًا مقابل حد 10 مللي ثانية |
-| A-04 | `btree_gist` + قيد `bookings_no_overlap` | ✅ على PostgreSQL 17 محليًا — ⏳ على Neon | Neon يدعم `btree_gist` 1.7 على PG17 (من وثائقه) |
+| A-04 | `btree_gist` + قيد `bookings_no_overlap` | ✅ على PostgreSQL 18 محليًا — ⏳ على Neon | Neon يدعم `btree_gist` 1.8 على PG18 (من وثائقه) |
 | A-05 | Transaction حقيقية من Workers | ✅ محليًا على workerd عبر driver Neon — ⏳ على Workers + Neon | |
 
 ---
@@ -37,7 +37,7 @@
 - 10 branches لكل مشروع؛ نافذة استعادة 6 ساعات؛ 5 جيجا egress شهريًا.
 - عند نفاد الحوسبة: تُوقف حتى الشهر التالي (لا حذف للبيانات). عند امتلاء التخزين: الكتابة تفشل.
 - PostgreSQL 14–18 متاح؛ منطقة Frankfurt `aws-eu-central-1` متاحة.
-- `btree_gist` مدعوم (1.7 على PG17) — https://neon.com/docs/extensions/pg-extensions
+- `btree_gist` مدعوم (1.8 على PG18، إصدار مشروعنا) — https://neon.com/docs/extensions/pg-extensions
 - ⚠️ **الاستخدام التجاري:** لم يُعثر على نص يمنعه أو يسمح به صراحة. وثيقة الإنتاج تقول إن المجاني "should be avoided for production workloads where uninterrupted availability matters" — https://neon.com/docs/get-started/production-checklist
 
 ### Hyperdrive (بديل محتمل للاتصال) — https://developers.cloudflare.com/hyperdrive/platform/pricing/
@@ -78,7 +78,7 @@
 
 ## A-04 — قيد منع التعارض
 
-اختبارات تكامل على PostgreSQL 17 حقيقي بنفس SQL الموجود في DATA_MODEL (6 حالات، كلها ناجحة): تداخل جزئي مرفوض؛ داخل الوقت الفاصل مرفوض؛ متلاصق `[)` مسموح؛ أماكن مختلفة مسموح؛ المبدئي والملغي لا يتأثران؛ تأكيد مبدئي على موعد محجوز مرفوض. ⏳ تشغيل نفس الاختبارات على Neon.
+اختبارات تكامل على PostgreSQL 18 حقيقي (نفس إصدار مشروع Neon) بنفس SQL الموجود في DATA_MODEL (6 حالات، كلها ناجحة): تداخل جزئي مرفوض؛ داخل الوقت الفاصل مرفوض؛ متلاصق `[)` مسموح؛ أماكن مختلفة مسموح؛ المبدئي والملغي لا يتأثران؛ تأكيد مبدئي على موعد محجوز مرفوض. ⏳ تشغيل نفس الاختبارات على Neon.
 
 ## A-05 — Transaction
 
