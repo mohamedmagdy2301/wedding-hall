@@ -1,0 +1,170 @@
+{
+  "id": "ffc37ac1-faf3-4838-80ca-96cc9d8b9992",
+  "prevId": "fed3b560-5931-4be8-aa13-951ad1212134",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.venues": {
+      "name": "venues",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "logo_key": {
+          "name": "logo_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Africa/Cairo'"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'EGP'"
+        },
+        "buffer_minutes": {
+          "name": "buffer_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tentative_hold_hours": {
+          "name": "tentative_hold_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_deposit_type": {
+          "name": "min_deposit_type",
+          "type": "min_deposit_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_deposit_value": {
+          "name": "min_deposit_value",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cancellation_basis": {
+          "name": "cancellation_basis",
+          "type": "cancellation_basis",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "postpone_credit_mode": {
+          "name": "postpone_credit_mode",
+          "type": "postpone_credit_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "venues_buffer_minutes_check": {
+          "name": "venues_buffer_minutes_check",
+          "value": "\"venues\".\"buffer_minutes\" >= 0"
+        },
+        "venues_tentative_hold_hours_check": {
+          "name": "venues_tentative_hold_hours_check",
+          "value": "\"venues\".\"tentative_hold_hours\" > 0"
+        },
+        "venues_min_deposit_value_check": {
+          "name": "venues_min_deposit_value_check",
+          "value": "\"venues\".\"min_deposit_value\" >= 0 AND (\"venues\".\"min_deposit_type\" <> 'percent' OR \"venues\".\"min_deposit_value\" <= 10000)"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.cancellation_basis": {
+      "name": "cancellation_basis",
+      "schema": "public",
+      "values": [
+        "deposit",
+        "total_paid"
+      ]
+    },
+    "public.min_deposit_type": {
+      "name": "min_deposit_type",
+      "schema": "public",
+      "values": [
+        "none",
+        "fixed",
+        "percent"
+      ]
+    },
+    "public.postpone_credit_mode": {
+      "name": "postpone_credit_mode",
+      "schema": "public",
+      "values": [
+        "refund",
+        "services",
+        "both"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
