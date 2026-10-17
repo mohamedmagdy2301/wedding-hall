@@ -34,3 +34,6 @@ Thumbs.db
 npm-debug.log*
 .vscode/*
 !.vscode/extensions.json
+
+# Claude Code personal settings
+.claude/settings.local.json
