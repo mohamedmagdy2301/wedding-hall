@@ -19,7 +19,10 @@
 `settings.get`, `settings.updateVenue(name, phone, address)`, `settings.updateTiming(bufferMinutes, tentativeHoldHours)` (يُرفض إن كسر BR-02 في أي مكان — D-51)، `settings.updatePolicies(minDeposit, cancellationBasis, tiers[], postponeCreditMode, confirmNoRefund?)` (D-73؛ `confirmNoRefund` مطلوب إن كانت كل الشرائح 0% — D-74)، إضافة/تعديل/تفعيل/تعطيل/ترتيب لـ `eventTypes`, `paymentMethods`, `expenseCategories` مع `addSuggested` (D-71)، و `setup.checklist` (للمالك).
 
 ## Catalog — `catalog.manage`
-CRUD لـ `spaces` (مع `slots`)، `seasons` (D-66)، `services`، `packages` (مع `prices[]` و `items[]`). لا حذف: التعطيل بـ `is_active`.
+CRUD لـ `spaces` (مع `slots`)، `seasons` (D-66)، `services`، `packages` (مع `prices[]` و `items[]`). لا حذف: التعطيل بـ `is_active` (D-82).
+- `services.create(name, category, pricingType, unitPrice, allowExternal, externalFee)`، `services.update(serviceId, …)` (تغيير `pricingType` يُرفض إن كانت الخدمة مضمنة في باكيج — D-80)، `services.setActive(serviceId, active)`.
+- `packages.create(spaceId, name, description, baseGuests, extraGuestPrice, isActive, prices[{slotKind, seasonId|null, price}], items[{serviceId, quantity, removable, removalCredit}])`.
+- `packages.update(packageId, version, …نفس الحقول عدا spaceId)` و `packages.setActive(packageId, version, active)`: إن تغيّر `version` منذ فتح الصفحة ← `CONCURRENT_MODIFICATION` (D-81). التفعيل بلا سعر عادي ← `BUSINESS_RULE_VIOLATION` (BR-30، D-78).
 
 ## Pricing — `bookings.view`
 | العملية | المدخلات | المخرجات |

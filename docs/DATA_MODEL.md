@@ -70,15 +70,21 @@
 | allow_external | bool | يحدد السماح بالمتعهد الخارجي (D-39) |
 | is_active | bool | |
 
+الاسم فريد على `(venue_id, lower(name))` شاملًا المعطّل (D-76). `unit_price ≥ 0`، `external_fee ≥ 0` و = 0 إن لم يكن `allow_external` (D-79). `pricing_type` لا يتغير ما دامت الخدمة مضمنة في باكيج (D-80).
+
 ### packages
-`id, venue_id, space_id, name, description, base_guests int, extra_guest_price bigint, is_active`
+`id, venue_id, space_id, name, description null, base_guests int, extra_guest_price bigint, is_active, version int`
+الاسم فريد على `(space_id, lower(name))` شاملًا المعطّل (D-76). `space_id` لا يتغير بعد الإنشاء، ولا يُنشأ باكيج على مكان معطّل (D-77). `base_guests` 0–100000، `extra_guest_price ≥ 0`، الوصف ≤ 500 (D-79). `version` للتحكم في التعديل المتزامن ويشمل الأسعار والبنود (D-81). الباكيج النشط له سعر عادي واحد على الأقل، يُفحص في الكود تحت قفل صف الباكيج (D-78).
 
 ### package_prices
 `id, venue_id, package_id, slot_kind enum(day, evening, full_day), season_id uuid null, price bigint`
-قيد فريد: `(package_id, slot_kind, coalesce(season_id, '00000000-...'))` أو فهرس فريد جزئي لكل حالة.
+قيد فريد: `(package_id, slot_kind, season_id)` بـ `NULLS NOT DISTINCT` (السعر العادي `season_id = null` مرة واحدة لكل فترة). `price > 0`. سعر الموسم لفترة يتطلب سعرًا عاديًا لنفس الفترة (D-78).
 
 ### package_items
 `id, venue_id, package_id, service_id, quantity int, removable bool, removal_credit bigint`
+قيد فريد: `(package_id, service_id)` (D-80). `quantity` 1–10000، و = 1 للخدمة الثابتة وبالفرد (يُفحص في الكود). `removal_credit ≥ 0` و = 0 إن لم تكن `removable` (D-79).
+
+> الأسعار والبنود تُحفظ مع الباكيج كمجموعة واحدة (D-81). الحجوزات لا تشير إلى صفوفهما بل تنسخ ما تحتاجه (BR-37). الخدمات والباكيجات لا تُحذف؛ التعطيل فقط (D-82).
 
 ## 4. العملاء والحجوزات
 
