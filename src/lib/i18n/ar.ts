@@ -528,6 +528,23 @@ export const ar = {
       itemQuantityOutOfRange: "الكمية من 1 إلى 10000.",
       removalCreditNotRemovable: "قيمة الإزالة للخدمة القابلة للإزالة فقط (BR-33).",
       inactiveServiceAdded: "الخدمة معطّلة: لا تُضاف لباكيج. فعّلها أولًا.",
+      // Pricing (phase 4, pricing.quote).
+      packageInactive: "الباكيج معطّل: لا يُحجز. اختار باكيج تاني (D-87).",
+      spaceInactiveForBooking: "المكان معطّل: لا يُحجز عليه (BR-06).",
+      slotNotPriced: "الباكيج ده ملوش سعر عادي للفترة دي، فمينفعش يتحجز عليها (BR-30).",
+      guestsInvalid: "عدد المعازيم من 1 إلى 100000.",
+      removedDuplicate: "الخدمة متكررة في الخدمات المُزالة.",
+      itemNotIncluded: "الخدمة دي مش مضمنة في الباكيج.",
+      itemNotRemovable: "الخدمة دي مضمنة في الباكيج ومش مسموح بإزالتها (BR-33).",
+      addedDuplicate: "الخدمة مضافة مرتين؛ غيّر الكمية بدل التكرار.",
+      serviceInactive: "الخدمة معطّلة: مينفعش تتضاف للحجز (D-87).",
+      alreadyIncluded:
+        "الخدمة مضمنة في الباكيج: الخدمة بالعدد بس اللي تتزود منها وحدات، والخدمة المُزالة ترجع كمتعهد خارجي بس (D-90).",
+      quantityInvalid: 'الكمية للخدمة "بالعدد" من 1 إلى 10000، والثابتة وبالفرد كميتها 1.',
+      externalNotAllowed: "الخدمة دي مش مسموح فيها بمتعهد خارجي (BR-34).",
+      amountTooLarge: "المبلغ أكبر من الحد المسموح.",
+      negativeTotal: "الإجمالي مينفعش يبقى بالسالب: قيمة الخدمات المُزالة أكبر من السعر (BR-35).",
+      discountExceedsSubtotal: "الخصم أكبر من الإجمالي قبل الخصم (BR-52).",
     },
   },
 } as const;

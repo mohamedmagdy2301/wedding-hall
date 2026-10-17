@@ -85,8 +85,13 @@ const itemsOf = (rows: Awaited<ReturnType<typeof readChildren>>["items"], packag
     .filter((r) => r.packageId === packageId)
     .map(({ serviceId, quantity, removable, removalCredit }) => ({ serviceId, quantity, removable, removalCredit }));
 
-/** The package row, locked for the rest of the transaction when `lock` (D-81). */
-async function readPackage(db: DbOrTx, venueId: string, packageId: string, lock = false): Promise<PackageDetail> {
+/** The package row, locked for the rest of the transaction when `lock` (D-81). Items in package order. */
+export async function readPackage(
+  db: DbOrTx,
+  venueId: string,
+  packageId: string,
+  lock = false,
+): Promise<PackageDetail> {
   const query = db
     .select(packageColumns)
     .from(packages)
