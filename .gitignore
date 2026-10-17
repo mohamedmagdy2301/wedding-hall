@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# next.js / opennext / wrangler
+.next/
+out/
+.open-next/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+
+# build
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# testing
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.vscode/*
+!.vscode/extensions.json
