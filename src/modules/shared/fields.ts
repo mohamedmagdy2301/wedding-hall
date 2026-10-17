@@ -38,6 +38,16 @@ export const poundsField = numericText.transform((v, ctx) => {
   return piasters;
 });
 
+/** Pounds as typed, where zero is a valid amount (a free service, no extra-guest charge — D-79). */
+export const nonNegativePoundsField = numericText.transform((v, ctx) => {
+  const piasters = parsePounds(v);
+  if (piasters === null) {
+    ctx.addIssue({ code: "custom", message: "amountOrZeroInvalid" });
+    return z.NEVER;
+  }
+  return piasters;
+});
+
 /** A percentage as typed → basis points. */
 export const percentField = numericText.transform((v, ctx) => {
   const bps = parsePercent(v);

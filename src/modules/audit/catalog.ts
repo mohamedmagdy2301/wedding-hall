@@ -46,6 +46,14 @@ export const AUDIT_ACTIONS = [
   "expense_categories.update",
   "expense_categories.activate",
   "expense_categories.deactivate",
+  "services.create",
+  "services.update",
+  "services.activate",
+  "services.deactivate",
+  "packages.create",
+  "packages.update",
+  "packages.activate",
+  "packages.deactivate",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -60,5 +68,7 @@ export const AUDIT_ENTITY_TYPES = [
   "event_type",
   "payment_method",
   "expense_category",
+  "service",
+  "package",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
