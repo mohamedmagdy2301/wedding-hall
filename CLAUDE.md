@@ -1,7 +1,7 @@
 # CLAUDE.md — نظام إدارة قاعات الأفراح
 
 ## المشروع باختصار
-نظام ويب داخلي لإدارة حجوزات وتشغيل منشأة أفراح في مصر (أماكن متعددة، باكيجات قابلة للتخصيص، عرابين وأقساط، مصروفات وتقارير). يُباع كقالب: **نسخة مستقلة لكل منشأة** (نفس الكود + قاعدة بيانات منفصلة). تكلفة الاستضافة صفر.
+نظام ويب داخلي لإدارة حجوزات وتشغيل منشأة أفراح في مصر (أماكن متعددة، باكيجات قابلة للتخصيص، عرابين وأقساط، مصروفات وتقارير). يُباع كقالب: **نسخة مستقلة لكل منشأة** (نفس الكود + قاعدة بيانات منفصلة). التطوير مجاني؛ الإنتاج حساب Cloudflare واحد على Workers Paid (5 دولار شهريًا) فيه Worker لكل منشأة (D-57).
 
 ## الوثائق — المصدر الوحيد للحقيقة
 كل المتطلبات في `docs/`. ابدأ بـ `docs/README.md`.
@@ -23,7 +23,7 @@ Next.js (App Router) + TypeScript strict · Tailwind (RTL) · Zod · Drizzle ORM
 9. **الوقت:** `timestamptz` دائمًا، والحسابات بالتاريخ (الموسم، أيام الإلغاء) بتوقيت `Africa/Cairo` صراحة، لا بتوقيت السيرفر.
 10. **الطباعة وPDF في المتصفح**، لا على السيرفر.
 11. **لا مكتبة جديدة** قبل التأكد أنها تعمل على Cloudflare Workers.
-12. **لا أسرار في المستودع.** متغيرات البيئة فقط، ومثالها في `.env.example`.
+12. **لا أسرار في المستودع ولا في الـ bundle.** متغيرات البيئة فقط، ومثالها في `.env.example`. الأسرار في `.env.secrets.local` (للسكريبتات) و Worker secrets، **وليس** في `.env`/`.env.local` لأن OpenNext يضمّنها في الـ Worker (T-19). لا تُطبع قيم الأسرار في أي output.
 
 ## الاصطلاحات
 - واجهة المستخدم عربي فقط (RTL)، والنصوص مُجمّعة بحيث يسهل ترجمتها لاحقًا.
@@ -38,7 +38,31 @@ Next.js (App Router) + TypeScript strict · Tailwind (RTL) · Zod · Drizzle ORM
 - لا تضف أي شيء من "خارج النطاق" في `docs/PRD.md`.
 
 ## الأوامر
-> تُستكمل في المرحلة 0: dev، build، test، test:integration، test:e2e، db:migrate، db:seed، setup-venue، deploy.
+| الأمر | الوظيفة |
+|---|---|
+| `npm run db:up` | تشغيل PostgreSQL 18 المحلي + Neon wsproxy (docker compose) — مطلوب للتكامل و e2e |
+| `npm run dev` | خادم التطوير |
+| `npm run build` | بناء Next.js |
+| `npm run lint` / `npm run typecheck` / `npm run format:check` | فحص الكود |
+| `npm test` | اختبارات الوحدات (Vitest) |
+| `npm run test:integration` | اختبارات التكامل على PostgreSQL 18 حقيقي في Docker، عبر driver الإنتاج |
+| `npm run test:integration:neon` | نفس اختبارات التكامل في قاعدة مؤقتة على مشروع Neon (تُحذف بعدها) |
+| `npm run test:e2e` | Playwright (كمبيوتر + موبايل)؛ `E2E_BASE_URL=<url>` لاختبار نسخة قائمة |
+| `npm run db:generate` | توليد Migration من المخطط (drizzle-kit) |
+| `npm run db:migrate` | تطبيق الـ Migrations (`DATABASE_URL_UNPOOLED`) |
+| `npm run db:seed` | بيانات تجريبية للتطوير فقط |
+| `npm run db:info` | إصدار القاعدة وأسماء الجداول والامتدادات (بلا أسرار) |
+| `npm run env:check` | أسماء المفاتيح و set/missing فقط |
+| `npm run cf:build` | بناء الـ Worker مع حارس الأسرار قبل البناء وبعده |
+| `npm run preview` | تشغيل الـ Worker المبني محليًا على workerd |
+| `npm run deploy` | بناء + نشر على Cloudflare |
+| `npm run setup-venue` | تجهيز نسخة منشأة جديدة — **يُنفَّذ في المرحلة 1** |
 
 ## حالة المشروع
-> تُحدّث في نهاية كل مرحلة: المرحلة الحالية، ما اكتمل، الملاحظات المفتوحة.
+- **المرحلة الحالية:** المرحلة 0 مكتملة (2026-10-17) — بانتظار موافقة مالك المنتج على خطة المرحلة 1.
+- **ما اكتمل:** الهيكل (Next.js 16.4 + OpenNext)، RTL والخط العربي، Drizzle + أول Migration (`btree_gist` + `venues`) على Neon، الاختبارات بالمستويات الثلاثة، CI، النشر على `wedding-hall.email13579test-7ee.workers.dev`، وتجارب A-01..A-05 (`docs/spikes/PHASE0.md`).
+- **ملاحظات مفتوحة:**
+  - الإنتاج يحتاج ترقية الحساب لـ Workers Paid قبل أول منشأة حقيقية (D-57)، وتأكيد شروط Neon التجارية (D-59) — المرحلة 12.
+  - تشفير كلمات المرور يُقيّم في بداية المرحلة 1 (D-58).
+  - Server Action فحص القاعدة في الصفحة الرئيسية مؤقتة بلا جلسة، وتُزال في المرحلة 1.
+  - اختبارات `tests/integration/spikes/` (A-04/A-05) تُستبدل باختبارات الحجوزات الحقيقية في المرحلة 5.
