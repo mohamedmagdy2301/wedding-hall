@@ -20,9 +20,45 @@ export const AUDIT_ACTIONS = [
   "roles.create",
   "roles.update",
   "roles.delete",
+  "settings.venue_updated",
+  "settings.timing_updated",
+  "settings.policies_updated",
+  "spaces.create",
+  "spaces.update",
+  "spaces.activate",
+  "spaces.deactivate",
+  "spaces.reorder",
+  "seasons.create",
+  "seasons.update",
+  "seasons.activate",
+  "seasons.deactivate",
+  "event_types.create",
+  "event_types.update",
+  "event_types.activate",
+  "event_types.deactivate",
+  "event_types.reorder",
+  "payment_methods.create",
+  "payment_methods.update",
+  "payment_methods.activate",
+  "payment_methods.deactivate",
+  "payment_methods.reorder",
+  "expense_categories.create",
+  "expense_categories.update",
+  "expense_categories.activate",
+  "expense_categories.deactivate",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
-export const AUDIT_ENTITY_TYPES = ["venue", "user", "role", "session"] as const;
+export const AUDIT_ENTITY_TYPES = [
+  "venue",
+  "user",
+  "role",
+  "session",
+  "space",
+  "season",
+  "event_type",
+  "payment_method",
+  "expense_category",
+] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
