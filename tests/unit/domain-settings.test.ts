@@ -30,11 +30,24 @@ describe("money (BR-36)", () => {
     ["١٥٠٠٫٥", 150050],
     [" 0 ", 0],
     ["0.01", 1],
+    // Where × 100 on a float goes wrong: 19.99 × 100 = 1998.9999999999998, 0.29 × 100 = 28.999999999999996.
+    ["1234.56", 123456],
+    ["0.1", 10],
+    ["19.99", 1999],
+    ["0.29", 29],
+    ["1.15", 115],
   ])("parses %s pounds as %i piasters, without floating point", (input, piasters) => {
     expect(parsePounds(input)).toBe(piasters);
   });
 
-  it.each(["", "-5", "1.005", "abc", "1.2.3", "1e3", "١٠٠ج"])("rejects %s", (input) => {
+  it("the float route really is wrong for these amounts — which is why the text is read digit by digit", () => {
+    expect(19.99 * 100).not.toBe(1999);
+    expect(0.29 * 100).not.toBe(29);
+    expect(1.15 * 100).not.toBe(115);
+    expect([parsePounds("19.99"), parsePounds("0.29"), parsePounds("1.15")]).toEqual([1999, 29, 115]);
+  });
+
+  it.each(["", "-5", "1.005", "1234.565", "abc", "1.2.3", "1e3", "١٠٠ج"])("rejects %s", (input) => {
     expect(parsePounds(input)).toBeNull();
   });
 

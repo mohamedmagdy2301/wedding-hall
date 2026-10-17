@@ -314,6 +314,18 @@ describe("pricing: never negative (BR-35, D-89)", () => {
   it("PR-47: BR-35 is checked before BR-52", () => {
     expect(roof(50, { removedServiceIds: both, discountAmount: 1 })).toEqual({ ok: false, violation: "negativeTotal" });
   });
+
+  it("PR-56 (from the P-01 / P-06 counterexample): one piaster below zero is refused, at the smallest amounts", () => {
+    const tiny = catalogFor({
+      baseGuests: 0,
+      extraGuestPrice: 0,
+      prices: [{ slotKind: "day", seasonId: null, price: 1 }],
+      included: [{ service: S.FIRE, quantity: 1, removable: true, removalCredit: 2 }],
+    });
+    const day = { slotKind: "day" as const, guests: 1 };
+    expect(quote({ ...day, removedServiceIds: ["FIRE"] }, tiny)).toEqual({ ok: false, violation: "negativeTotal" });
+    expect(quote(day, tiny)).toMatchObject({ ok: true, breakdown: { total: 1 } }); // 1 piaster
+  });
 });
 
 describe("pricing: inputs and bounds (D-87)", () => {
