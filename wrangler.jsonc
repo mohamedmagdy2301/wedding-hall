@@ -11,5 +11,14 @@
   "observability": {
     "enabled": true,
   },
+  // Development Worker on the free plan (10 ms CPU): lighter password hashing (D-65).
+  // A production/venue environment must not set APP_ENV to development; without these
+  // vars the OWASP defaults apply, and `npm run cf:build` refuses weaker ones.
+  "vars": {
+    "APP_ENV": "development",
+    "PASSWORD_HASH_MEMORY_KIB": "4096",
+    "PASSWORD_HASH_ITERATIONS": "1",
+    "PASSWORD_HASH_PARALLELISM": "1",
+  },
   // Secrets (set with `wrangler secret put`): DATABASE_URL
 }
