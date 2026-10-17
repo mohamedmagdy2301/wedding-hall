@@ -20,6 +20,13 @@
 | 11 | [TESTING.md](TESTING.md) | استراتيجية الاختبار |
 | 12 | [ROADMAP.md](ROADMAP.md) | مراحل التنفيذ ومعايير القبول |
 
+## وثائق التنفيذ
+
+| المجلد | المحتوى |
+|---|---|
+| [phases/](phases/) | خطط المراحل المعتمدة (مثل `PHASE1_PLAN.md`) |
+| [spikes/](spikes/) | نتائج تجارب التحقق التقني (مثل `PHASE0.md`) |
+
 ## قاعدة الأولوية عند التعارض
 
 `DECISIONS.md` ← `BUSINESS_RULES.md` ← `DATA_MODEL.md` ← باقي الوثائق.
