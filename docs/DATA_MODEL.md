@@ -175,7 +175,7 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 قيد فريد: `(venue_id, login)` (D-42). `must_change_password` يُجبر تغيير كلمة المرور المؤقتة (D-45، SEC-05).
 
 ### sessions
-حسب مكتبة الدخول المختارة (أو جدول `sessions(id, user_id, expires_at)`).
+`id, user_id, token_hash, expires_at, last_seen_at, created_at` — يُخزن hash التوكن فقط لا التوكن نفسه (D-61). بلا `venue_id`؛ تتبع المنشأة عبر `user_id` (D-63). وكذلك `role_permissions` و `user_roles` أدناه.
 
 ### roles
 `id, venue_id, name, is_system bool (للأدوار الافتراضية)`
