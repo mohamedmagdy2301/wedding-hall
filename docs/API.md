@@ -27,7 +27,9 @@ CRUD لـ `spaces` (مع `slots`)، `seasons` (D-66)، `services`، `packages` (
 ## Pricing — `bookings.view`
 | العملية | المدخلات | المخرجات |
 |---|---|---|
-| `pricing.quote` | spaceId, packageId, slotKind, eventDate, guests, items[{serviceId, quantity, isExternal}], removedPackageItemIds[], discountAmount? | تفصيل كامل: basePrice, seasonId, extraGuestsAmount, lines[], removalCredits, externalFees, discount, total |
+| `pricing.quote` | spaceId, packageId, slotKind, eventDate, guests (1–100000), items[{serviceId, quantity, isExternal}] (≤ 100)، removedServiceIds[] (≤ 100، D-86)، discountAmount? (المعتمد فقط — BR-50) | تفصيل كامل `PriceBreakdown`: basePrice, seasonId (الموسم المطبق — D-88), dateSeasonId, baseGuests, extraGuestPrice, extraGuests, extraGuestsAmount, lines[], itemsTotal (شامل رسوم الخارجي — D-85), externalFeesTotal, removalCreditsTotal, subtotal, discountAmount, total |
+
+للقراءة فقط: لا يكتب شيئًا ولا سجل عمليات، ويقرأ الأسعار الحالية في كل مرة. يُرفض: باكيج معطّل أو على مكان معطّل (BR-06)، فترة بلا سعر عادي (BR-30)، إزالة غير مسموحة (BR-33)، خارجي غير مسموح (BR-34)، إجمالي سالب (BR-35)، خصم أكبر من الإجمالي قبل الخصم (BR-52)، خدمة معطّلة أو إضافة مضمنة غير مسموحة (D-87، D-90).
 
 ## Availability — `bookings.view`
 `availability.check(spaceId, startsAt, endsAt, excludeBookingId?)` ← `{ available, conflicts[] }`

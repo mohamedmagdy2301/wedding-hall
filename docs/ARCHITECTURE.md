@@ -28,7 +28,7 @@ Modular Monolith في مشروع Next.js واحد (TypeScript)، منشور عل
 | الدخول | تنفيذ داخلي بلا مكتبة دخول خارجية: جدول `sessions` في قاعدة البيانات يخزن hash التوكن فقط، وكوكي `HttpOnly` | D-61 (P1-10)؛ كلمات المرور Argon2id عبر `@phi-ag/argon2` (WASM) بنسخة جديدة لكل عملية (D-64، D-65) |
 | الملفات | Cloudflare R2 عبر واجهة S3 | روابط موقعة قصيرة العمر |
 | الاستضافة | Cloudflare Workers | محوّل Next.js المناسب (A-02) |
-| الاختبار | Vitest، وPostgreSQL حقيقي للتكامل، وPlaywright للرحلات | |
+| الاختبار | Vitest، وPostgreSQL حقيقي للتكامل، وPlaywright للرحلات | `fast-check` لاختبارات الخواص في أدوات التطوير فقط (D-96) |
 | النسخ الاحتياطي | GitHub Actions مجدول ← pg_dump ← R2 | |
 
 > **مهم:** المكتبات وإصداراتها تُحدد وتُتحقق من توافقها مع Cloudflare Workers في المرحلة 0 قبل البناء عليها.
