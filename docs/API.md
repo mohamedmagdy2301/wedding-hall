@@ -3,7 +3,7 @@
 > في الـ MVP تُستدعى هذه العمليات عبر Server Actions. كل عملية: جلسة صالحة + مدخلات صالحة (Zod) + الصلاحية المذكورة. الأخطاء ترجع بكود ثابت ورسالة عربية.
 
 ## أكواد الأخطاء العامة
-`UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT_SLOT_TAKEN`, `CONCURRENT_MODIFICATION`, `BUSINESS_RULE_VIOLATION` (مع رقم القاعدة BR-xx).
+`UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT_SLOT_TAKEN`, `CONCURRENT_MODIFICATION`, `BUSINESS_RULE_VIOLATION` (مع رقم القاعدة BR-xx)، `INTERNAL_ERROR` (خطأ غير متوقع: رسالة عامة للمستخدم، ونص الخطأ فقط في سجل الخادم بلا بيانات حساسة — SEC-32).
 
 ## Auth
 | العملية | المدخلات | ملاحظات |
