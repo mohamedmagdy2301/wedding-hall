@@ -37,10 +37,10 @@ CRUD لـ `spaces` (مع `slots`)، `services`، `packages` (مع `prices[]` و 
 | `bookings.createConfirmed` | create + payments.record | مع عربون وأقساط |
 | `bookings.confirm(id, deposit, installments[])` | confirm + payments.record | BR-21/22 |
 | `bookings.updateDetails` | edit | بيانات غير مالية |
-| `bookings.updateItems(id, version, changes)` | edit | BR-40..43 |
+| `bookings.updateItems(id, version, changes, installments?, creditResolution?)` | edit | BR-40..43؛ يشمل تغيير عدد المعازيم (D-35)، وإعادة ضبط الأقساط إن تغيّر الإجمالي (D-34) |
 | `bookings.postpone(id, version, newDate, slotKind, times, creditResolution?)` | postpone | BR-80..85 |
 | `bookings.cancelPreview(id)` | cancel | الأيام، الشريحة، الأساس، المقترح |
-| `bookings.cancel(id, version, refundAmount, reason)` | cancel (+ payments.refund إن وُجد استرداد) | BR-70..74 |
+| `bookings.cancel(id, version, refundAmount, methodId?, reason)` | cancel (+ payments.refund إن وُجد استرداد) | BR-70..76؛ `methodId` مطلوب إن كان `refundAmount > 0` (D-47) |
 | `bookings.get`, `bookings.list(filters)` | view | |
 
 ## Discounts

@@ -18,7 +18,7 @@
 | name | text | |
 | logo_key | text null | مفتاح الملف في R2 |
 | phone, address | text null | |
-| timezone | text | افتراضي `Africa/Cairo` |
+| timezone | text | افتراضي `Africa/Cairo`؛ للمستقبل فقط ولا يُعدّل من الواجهة، والكود يستخدم ثابت `Africa/Cairo` (T-16) |
 | currency | text | افتراضي `EGP` |
 | buffer_minutes | int | الوقت الفاصل ≥ 0 |
 | tentative_hold_hours | int | مدة صلاحية الحجز المبدئي > 0 |
@@ -64,8 +64,8 @@
 | category | enum(`service`,`show`,`hospitality`) | |
 | pricing_type | enum(`fixed`,`per_unit`,`per_guest`) | |
 | unit_price | bigint | |
-| external_fee | bigint null | رسوم دخول المتعهد الخارجي؛ null = لا يُسمح/لا رسوم |
-| allow_external | bool | |
+| external_fee | bigint not null default 0 | رسوم دخول المتعهد الخارجي، ثابتة لكل بند ولا تُضرب في الكمية (D-39) |
+| allow_external | bool | يحدد السماح بالمتعهد الخارجي (D-39) |
 | is_active | bool | |
 
 ### packages
@@ -82,13 +82,13 @@
 
 ### customers
 `id, venue_id, name, phone, alt_phone null, notes null`
-فهرس غير فريد على `(venue_id, phone)` (D-28: لا منع للتكرار).
+فهرس غير فريد على `(venue_id, phone)` (D-28: لا منع للتكرار). أرقام الموبايل تُخزن موحّدة بصيغة `01XXXXXXXXX` (D-52).
 
 ### bookings
 | العمود | النوع | ملاحظات |
 |---|---|---|
 | id, venue_id | | |
-| booking_no | text unique | مثل `2026-0015` |
+| booking_no | text | مثل `2026-0015`؛ فريد على `(venue_id, booking_no)` (D-42) |
 | space_id | uuid | |
 | customer_id | uuid | |
 | event_type_id | uuid null | مطلوب للتأكيد |
@@ -102,6 +102,8 @@
 | tentative_expires_at | timestamptz null | |
 | season_id | uuid null | لقطة |
 | base_price, extra_guests_amount, items_total, removal_credits_total, discount_amount, total | bigint | لقطة السعر |
+| base_guests | int null | لقطة من الباكيج وقت التأكيد (D-35) |
+| extra_guest_price | bigint null | لقطة من الباكيج وقت التأكيد؛ تُستخدم لرد تخفيض المعازيم (D-35) |
 | cancelled_at, cancelled_by, cancel_reason | | |
 | confirmed_at, confirmed_by | | |
 | notes | text null | |
@@ -126,7 +128,7 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 | service_id | null مسموح (مرجع فقط) |
 | name, category, pricing_type | نسخة وقت الإضافة |
 | unit_price, quantity | |
-| source | enum(`package`,`added`) |
+| source | enum(`package`,`added`,`guest_adjustment`) — `guest_adjustment` بنود زيادة المعازيم بعد التأكيد بالأسعار الحالية (D-35) |
 | is_removed | للبنود المضمنة المُزالة |
 | removal_credit | قيمة خصم الإزالة المنسوخة |
 | is_external | |
@@ -137,7 +139,7 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 `id, venue_id, booking_id, amount bigint, reason, status enum(pending, approved, rejected), requested_by, decided_by null, decided_at null`
 
 ### booking_changes
-`id, venue_id, booking_id, kind enum(postpone, items, guests, price_override), before jsonb, after jsonb, total_before, total_after, credit_resolution enum(refund, services) null, created_by`
+`id, venue_id, booking_id, kind enum(postpone, items, guests, price_override, discount), before jsonb, after jsonb, total_before, total_after, credit_resolution enum(refund, services) null, created_by`
 
 ### booking_documents
 `id, venue_id, booking_id, kind enum(national_id, signed_contract, other), file_key, mime_type, size_bytes, uploaded_by`
@@ -146,12 +148,13 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 
 ### installments
 `id, venue_id, booking_id, due_date date, amount bigint, sort_order`
+الجدول اختياري؛ إن وُجد: العربون + Σ الأقساط = الإجمالي، وآخر `due_date` ≤ يوم الحفلة − 1 (BR-65).
 
 ### payments
 | العمود | ملاحظات |
 |---|---|
 | id, venue_id, booking_id | |
-| receipt_no | text unique، متسلسل للمنشأة |
+| receipt_no | text، متسلسل للمنشأة بلا تصفير (`000001`)؛ فريد على `(venue_id, receipt_no)` (D-42) |
 | kind | enum(`deposit`,`installment`,`payment`,`refund`) |
 | amount | bigint > 0 دائمًا؛ الاتجاه من `kind` |
 | payment_method_id | |
@@ -168,7 +171,8 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 ## 7. المستخدمون والصلاحيات
 
 ### users
-`id, venue_id, name, login text unique (موبايل أو اسم مستخدم), password_hash, is_owner bool, is_active bool, failed_attempts int, locked_until timestamptz null, last_login_at`
+`id, venue_id, name, login text (موبايل موحّد أو اسم مستخدم), password_hash, is_owner bool, is_active bool, must_change_password bool, failed_attempts int, locked_until timestamptz null, last_login_at`
+قيد فريد: `(venue_id, login)` (D-42). `must_change_password` يُجبر تغيير كلمة المرور المؤقتة (D-45، SEC-05).
 
 ### sessions
 حسب مكتبة الدخول المختارة (أو جدول `sessions(id, user_id, expires_at)`).
