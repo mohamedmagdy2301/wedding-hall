@@ -1,35 +1,25 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Client } from "pg";
-import { venues } from "../src/db/schema";
-import { requireEnv } from "./lib/load-env";
+import { setupVenue } from "../src/modules/settings/setup";
+import { askNewPassword } from "./lib/prompt";
+import { fail, scriptDeps } from "./lib/services";
 
-// Development/demo data only. Real venues are created by `setup-venue` (phase 1).
+/**
+ * Development/demo data only: a demo venue with the owner login "owner". Real venues are
+ * created with `npm run setup-venue`. The temporary password is typed hidden.
+ */
 async function main() {
-  const client = new Client({ connectionString: requireEnv("DATABASE_URL_UNPOOLED", "DATABASE_URL") });
-  await client.connect();
+  const ownerTempPassword = await askNewPassword("Demo owner temporary password (hidden)");
+  const { deps, handle } = scriptDeps();
   try {
-    const db = drizzle({ client });
-    const existing = await db.select({ id: venues.id }).from(venues).limit(1);
-    if (existing.length > 0) {
-      console.log("Seed skipped: a venue already exists.");
-      return;
-    }
-    await db.insert(venues).values({
-      name: "قاعة تجريبية",
-      bufferMinutes: 60,
-      tentativeHoldHours: 48,
-      minDepositType: "none",
-      minDepositValue: 0,
-      cancellationBasis: "deposit",
-      postponeCreditMode: "refund",
+    await setupVenue(deps, {
+      venueName: "قاعة تجريبية",
+      ownerName: "مالك تجريبي",
+      ownerLogin: "owner",
+      ownerTempPassword,
     });
-    console.log("Seeded demo venue.");
+    console.log('Seeded demo venue. Sign in as "owner" with the temporary password you typed.');
   } finally {
-    await client.end();
+    await handle.close();
   }
 }
 
-main().catch((error: unknown) => {
-  console.error("Seed failed:", error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+main().catch(fail);
