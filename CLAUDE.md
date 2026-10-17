@@ -56,20 +56,25 @@ Next.js (App Router) + TypeScript strict · Tailwind (RTL) · Zod · Drizzle ORM
 | `npm run test:e2e` | Playwright (كمبيوتر + موبايل)؛ `E2E_BASE_URL=<url>` لاختبار نسخة قائمة |
 | `npm run db:generate` | توليد Migration من المخطط (drizzle-kit) |
 | `npm run db:migrate` | تطبيق الـ Migrations (`DATABASE_URL_UNPOOLED`) |
-| `npm run db:seed` | بيانات تجريبية للتطوير فقط |
-| `npm run db:info` | إصدار القاعدة وأسماء الجداول والامتدادات (بلا أسرار) |
+| `npm run db:seed` | منشأة تجريبية للتطوير فقط (مالك `owner`، كلمة مؤقتة تُكتب مخفية) |
+| `npm run db:info` | إصدار القاعدة وأسماء الجداول والامتدادات وعدد صفوف venues/users/roles (بلا أسرار) |
 | `npm run env:check` | أسماء المفاتيح و set/missing فقط |
-| `npm run cf:build` | بناء الـ Worker مع حارس الأسرار قبل البناء وبعده |
+| `npm run cf:build` | بناء الـ Worker مع حارس الأسرار وحارس معاملات التشفير (D-65) قبل البناء وبعده |
 | `npm run preview` | تشغيل الـ Worker المبني محليًا على workerd |
-| `npm run deploy` | بناء + نشر على Cloudflare |
-| `npm run setup-venue` | تجهيز نسخة منشأة جديدة — **يُنفَّذ في المرحلة 1** |
+| `npm run deploy` | بناء + نشر على Cloudflare (Worker التطوير فقط بدون موافقة جديدة) |
+| `npm run setup-venue -- --venue-name … --owner-name … --owner-login …` | تجهيز منشأة جديدة: المنشأة والمالك والأدوار والإعدادات الافتراضية؛ الكلمة المؤقتة مخفية؛ يرفض لو المنشأة موجودة |
+| `npm run support:remove-owner -- --login …` | دعم فني: إزالة الملكية من مالك (يبقى مالك نشط آخر) — P1-11 |
+| `npm run support:reset-owner-password -- --login …` | دعم فني: كلمة مؤقتة لمالك نسي كلمة مروره — P1-11 |
+
+> السكريبتات تشفّر بمعاملات OWASP افتراضيًا. لقاعدة Worker التطوير (الخطة المجانية) ضع `APP_ENV=development` والمعاملات الخفيفة في متغيرات البيئة للأمر نفسه (D-65).
 
 ## حالة المشروع
-- **المرحلة الحالية:** المرحلة 1 قيد التنفيذ حسب `docs/phases/PHASE1_PLAN.md`. الخطوة 1.0 (قياس التشفير) انتهت بقرار D-64 و D-65 (`docs/spikes/PHASE1_HASHING.md`).
-- **ما اكتمل:** الهيكل (Next.js 16.4 + OpenNext)، RTL والخط العربي، Drizzle + أول Migration (`btree_gist` + `venues`) على Neon، الاختبارات بالمستويات الثلاثة، CI، النشر على `wedding-hall.email13579test-7ee.workers.dev`، وتجارب A-01..A-05 (`docs/spikes/PHASE0.md`).
+- **المرحلة الحالية:** المرحلة 1 **منفذة وبانتظار مراجعة وموافقة مالك المنتج** (2026-10-17). لا تبدأ المرحلة 2 قبل الموافقة.
+- **ما اكتمل:** المرحلة 0 (الهيكل، RTL، Drizzle، الاختبارات، CI، النشر على `wedding-hall.email13579test-7ee.workers.dev`، `docs/spikes/PHASE0.md`). المرحلة 1: تشفير Argon2id (D-64/D-65، `docs/spikes/PHASE1_HASHING.md`)، الدخول والقفل والجلسات وتغيير كلمة المرور، الموظفون والأدوار والملاك (BR-100..102، P1-11)، سجل العمليات append-only، غلاف الـ Server Actions الموحد، سكريبتات الإعداد والدعم الفني، الشاشات S-01 و S-02 و S-15 و S-16 بـ shadcn/ui (RTL). Migration `0002` مطبقة على قاعدة Neon التطوير.
 - **ملاحظات مفتوحة:**
   - الإنتاج يحتاج ترقية الحساب لـ Workers Paid قبل أول منشأة حقيقية (D-57)، وتأكيد شروط Neon التجارية (D-59) — المرحلة 12.
   - إعادة قياس التشفير على Workers Paid بالإعدادات النهائية قبل أول قاعة (المرحلة 12، D-64).
   - شرائح الإلغاء خطوة إجبارية في قائمة الإعداد قبل أي تأكيد حجز (D-60) — المرحلة 2.
-  - Server Action فحص القاعدة في الصفحة الرئيسية مؤقتة بلا جلسة، وتُزال في المرحلة 1.
+  - الصفحة الرئيسية مؤقتة (ترحيب فقط)؛ S-03 في المرحلة 11.
+  - على الخطة المجانية عرض الصفحة نفسه يتجاوز 10 مللي ثانية CPU أحيانًا (معروف من المرحلة 0، D-57).
   - اختبارات `tests/integration/spikes/` (A-04/A-05) تُستبدل باختبارات الحجوزات الحقيقية في المرحلة 5.

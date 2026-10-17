@@ -172,13 +172,14 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 
 ### users
 `id, venue_id, name, login text (موبايل موحّد أو اسم مستخدم), password_hash, is_owner bool, is_active bool, must_change_password bool, failed_attempts int, locked_until timestamptz null, last_login_at`
-قيد فريد: `(venue_id, login)` (D-42). `must_change_password` يُجبر تغيير كلمة المرور المؤقتة (D-45، SEC-05).
+قيد فريد: `(venue_id, login)` (D-42)، و `login` مخزن موحّدًا بحروف صغيرة (P1-04). `must_change_password` يُجبر تغيير كلمة المرور المؤقتة (D-45، SEC-05). `password_hash` بصيغة PHC لـ Argon2id مع معاملاته (D-64، P1-09).
 
 ### sessions
 `id, user_id, token_hash, expires_at, last_seen_at, created_at` — يُخزن hash التوكن فقط لا التوكن نفسه (D-61). بلا `venue_id`؛ تتبع المنشأة عبر `user_id` (D-63). وكذلك `role_permissions` و `user_roles` أدناه.
 
 ### roles
 `id, venue_id, name, is_system bool (للأدوار الافتراضية)`
+قيد فريد: `(venue_id, name)`. الدور الذي عليه موظفون لا يُحذف (المفتاح الأجنبي في `user_roles` بـ RESTRICT — P1-06).
 
 ### role_permissions
 `role_id, permission_key text` — المفاتيح من القائمة الثابتة في ROLES_PERMISSIONS.md.
@@ -188,7 +189,7 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 
 ### audit_logs
 `id, venue_id, actor_id null, action text, entity_type text, entity_id uuid null, before jsonb null, after jsonb null, meta jsonb null, created_at`
-فهارس على `(entity_type, entity_id)` و `(created_at)`.
+فهارس على `(entity_type, entity_id)` و `(created_at)` و `(actor_id, created_at)`. trigger يرفض UPDATE و DELETE (SEC-42).
 
 ## 8. فهارس مهمة
 
