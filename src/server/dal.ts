@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { cache } from "react";
 import { getDb } from "@/db/request";
 import { listAudit, listAuditActors, type AuditFilters } from "@/modules/audit/service";
@@ -16,7 +17,10 @@ import { readSessionToken } from "./session-cookie";
  * re-run on client navigation. `cache` dedupes the check within one render.
  */
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
-  return resolveSession(getDb(), await readSessionToken(), new Date());
+  // Per-request data: never prerendered at build time.
+  await connection();
+  const token = await readSessionToken();
+  return resolveSession(getDb(), token, new Date());
 });
 
 export async function requireUser(options: { allowPendingPasswordChange?: boolean } = {}): Promise<SessionUser> {
