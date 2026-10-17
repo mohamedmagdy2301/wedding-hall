@@ -1,11 +1,11 @@
 import { asc, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { DbOrTx } from "@/modules/shared/db";
 import { venues } from "@/db/schema";
 
 export type VenueSummary = { id: string; name: string };
 
 /** Each deployment serves exactly one venue (D-01). */
-export async function getVenueSummary(db: Db): Promise<VenueSummary | null> {
+export async function getVenueSummary(db: DbOrTx): Promise<VenueSummary | null> {
   const rows = await db
     .select({ id: venues.id, name: venues.name })
     .from(venues)
@@ -14,7 +14,7 @@ export async function getVenueSummary(db: Db): Promise<VenueSummary | null> {
   return rows[0] ?? null;
 }
 
-export async function getDatabaseTime(db: Db): Promise<Date> {
+export async function getDatabaseTime(db: DbOrTx): Promise<Date> {
   const result = await db.execute<{ now: string }>(sql`select now()::text as now`);
   return new Date(result.rows[0].now);
 }
