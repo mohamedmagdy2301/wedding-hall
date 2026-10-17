@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { auditLogs, packageItems, packagePrices, packages, seasons, services, spaces, venues } from "@/db/schema";
 import { listServices } from "@/modules/catalog/services";
 import { getPackage, listPackages } from "@/modules/packages/service";
+import { bookingReadiness, getSetupChecklist } from "@/modules/settings/checklist";
 import { VENUE_DEFAULTS } from "@/modules/settings/setup";
 import { catalogSpecs } from "@/server/specs/catalog";
 import type { ProtectedSpec } from "@/server/specs/define";
@@ -422,6 +423,75 @@ describe("catalog: services and packages (phase 3)", () => {
       expect(await itemRows(created.id)).toHaveLength(2);
       expect(await packageRow(created.id)).toMatchObject({ name: "الباكيج الفضي", version: 1 });
     });
+  });
+
+  it("UF-02 / D-77: the checklist and booking readiness follow the first service and the first priced package", async () => {
+    const base = await setUpVenueWithOwner(handle);
+    const call = (spec: unknown, input: unknown) =>
+      callSpec(handle, spec as AnySpec, base.owner.token, input) as Promise<Result<any>>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const status = async () =>
+      Object.fromEntries((await getSetupChecklist(db, base.owner.actor)).steps.map((x) => [x.key, x.status]));
+    const gaps = async () => (await bookingReadiness(db, base.venueId)).gaps;
+    expect(await status()).toMatchObject({ services: "missing", packages: "missing" });
+
+    const space = ok(await call(spaceSpecs.createSpace, { name: "القاعة الكبرى", capacityMax: "", ...slots })) as {
+      id: string;
+    };
+    ok(
+      await call(settingsSpecs.updatePolicies, {
+        minDepositType: "none",
+        cancellationBasis: "deposit",
+        postponeCreditMode: "refund",
+        tiers: [{ minDaysBefore: "30", refundBps: "50" }],
+      }),
+    );
+    const service = ok(await call(catalogSpecs.createService, dj)) as { id: string };
+    expect(await status()).toMatchObject({ services: "done", packages: "missing" });
+    expect(await gaps()).toEqual(["pricedPackage"]);
+
+    // A draft (inactive, no price) does not count.
+    const draft = ok(
+      await call(catalogSpecs.createPackage, {
+        spaceId: space.id,
+        name: "مسودة",
+        description: "",
+        baseGuests: "100",
+        extraGuestPrice: "0",
+        isActive: false,
+        prices: [],
+        items: [],
+      }),
+    ) as { id: string; version: number };
+    expect((await status()).packages).toBe("missing");
+
+    const priced = ok(
+      await call(catalogSpecs.updatePackage, {
+        packageId: draft.id,
+        version: draft.version,
+        name: "الفضي",
+        description: "",
+        baseGuests: "100",
+        extraGuestPrice: "0",
+        isActive: true,
+        prices: [{ slotKind: "full_day", seasonId: null, price: "80000" }],
+        items: [{ serviceId: service.id, quantity: "1", removable: false }],
+      }),
+    ) as { version: number };
+    expect(await status()).toMatchObject({ services: "done", packages: "done" });
+    expect(await bookingReadiness(db, base.venueId)).toEqual({ ready: true, gaps: [] });
+
+    // Deactivating the space makes its package unbookable (BR-06): missing again; the package stays active.
+    ok(await call(spaceSpecs.setSpaceActive, { spaceId: space.id, active: false }));
+    expect((await status()).packages).toBe("missing");
+    expect(await gaps()).toEqual(["activeSpace", "pricedPackage"]);
+    expect((await packageRow(draft.id)).isActive).toBe(true);
+    ok(await call(spaceSpecs.setSpaceActive, { spaceId: space.id, active: true }));
+
+    // So does deactivating the last package, and the last service.
+    ok(await call(catalogSpecs.setPackageActive, { packageId: draft.id, version: priced.version, active: false }));
+    ok(await call(catalogSpecs.setServiceActive, { serviceId: service.id, active: false }));
+    expect(await status()).toMatchObject({ services: "missing", packages: "missing" });
+    expect(await gaps()).toEqual(["pricedPackage"]);
   });
 
   it("cannot use another venue's space, season or service (venue_id scoping)", async () => {

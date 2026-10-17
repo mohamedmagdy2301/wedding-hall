@@ -1,5 +1,16 @@
-import { and, count, eq } from "drizzle-orm";
-import { cancellationTiers, eventTypes, paymentMethods, seasons, spaces, users, venues } from "@/db/schema";
+import { and, count, countDistinct, eq, isNull } from "drizzle-orm";
+import {
+  cancellationTiers,
+  eventTypes,
+  packagePrices,
+  packages,
+  paymentMethods,
+  seasons,
+  services,
+  spaces,
+  users,
+  venues,
+} from "@/db/schema";
 import { bookingReadinessGaps, setupChecklist, type SetupFacts } from "@/domain/setup-checklist";
 import type { SessionUser } from "@/modules/auth/sessions";
 import type { DbOrTx } from "@/modules/shared/db";
@@ -8,7 +19,7 @@ import { assertAllowed } from "@/modules/users-rbac/authorize";
 
 const first = async (query: PromiseLike<{ n: number }[]>) => (await query)[0].n;
 
-/** The facts behind UF-02 (D-71), read in parallel. Services and packages arrive in phase 3. */
+/** The facts behind UF-02 (D-71, D-77), read in parallel. */
 export async function setupFacts(db: DbOrTx, venueId: string): Promise<SetupFacts> {
   const [venue] = await db
     .select({ name: venues.name, phone: venues.phone, address: venues.address })
@@ -16,7 +27,16 @@ export async function setupFacts(db: DbOrTx, venueId: string): Promise<SetupFact
     .where(eq(venues.id, venueId));
   if (!venue) throw new AppError("NOT_FOUND", "venueNotSetUp");
   const n = { n: count() };
-  const [activeSpaces, activeSeasons, activeEventTypes, activePaymentMethods, tiers, activeStaff] = await Promise.all([
+  const [
+    activeSpaces,
+    activeSeasons,
+    activeEventTypes,
+    activePaymentMethods,
+    tiers,
+    activeStaff,
+    activeServices,
+    pricedPackages,
+  ] = await Promise.all([
     first(
       db
         .select(n)
@@ -48,6 +68,21 @@ export async function setupFacts(db: DbOrTx, venueId: string): Promise<SetupFact
         .from(users)
         .where(and(eq(users.venueId, venueId), eq(users.isActive, true), eq(users.isOwner, false))),
     ),
+    first(
+      db
+        .select(n)
+        .from(services)
+        .where(and(eq(services.venueId, venueId), eq(services.isActive, true))),
+    ),
+    // Bookable: an active package on an active space (BR-06) with a regular price (BR-30, D-77).
+    first(
+      db
+        .select({ n: countDistinct(packages.id) })
+        .from(packages)
+        .innerJoin(spaces, eq(spaces.id, packages.spaceId))
+        .innerJoin(packagePrices, and(eq(packagePrices.packageId, packages.id), isNull(packagePrices.seasonId)))
+        .where(and(eq(packages.venueId, venueId), eq(packages.isActive, true), eq(spaces.isActive, true))),
+    ),
   ]);
   return {
     venue,
@@ -57,8 +92,8 @@ export async function setupFacts(db: DbOrTx, venueId: string): Promise<SetupFact
     activePaymentMethods,
     cancellationTiers: tiers,
     activeStaff,
-    activeServices: null,
-    pricedPackages: null,
+    activeServices,
+    pricedPackages,
   };
 }
 

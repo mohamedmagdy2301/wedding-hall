@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, CircleDashed, Clock } from "lucide-react";
+import { CheckCircle2, Circle, CircleDashed } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import type { SetupStep, SetupStepKey, SetupStepStatus } from "@/domain/setup-checklist";
@@ -7,14 +7,16 @@ import { cn } from "@/lib/utils";
 
 const ts = t.setup;
 
-/** Where each step is done (UF-02). Services and packages get their pages in phase 3. */
-const STEP_HREF: Partial<Record<SetupStepKey, string>> = {
+/** Where each step is done (UF-02). */
+const STEP_HREF: Record<SetupStepKey, string> = {
   venue: "/settings/venue",
   spaces: "/settings/spaces",
   timing: "/settings/timing",
   seasons: "/settings/seasons",
   eventTypes: "/settings/event-types",
   paymentMethods: "/settings/payment-methods",
+  services: "/settings/services",
+  packages: "/settings/packages",
   policies: "/settings/policies",
   staff: "/staff",
 };
@@ -26,14 +28,12 @@ const ICONS: Record<SetupStepStatus, typeof Circle> = {
   done: CheckCircle2,
   missing: Circle,
   optional: CircleDashed,
-  unavailable: Clock,
 };
 
 const BADGE: Record<SetupStepStatus, "default" | "destructive" | "outline" | "secondary"> = {
   done: "secondary",
   missing: "destructive",
   optional: "outline",
-  unavailable: "outline",
 };
 
 /** S-14: every step with its status and a link; defaulted values are shown (D-71). */
@@ -72,13 +72,9 @@ export function SetupChecklist({
             <div className="grid flex-1 gap-0.5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground tabular-nums">{stepNumber.format(index + 1)}</span>
-                {href && step.status !== "unavailable" ? (
-                  <Link href={href} className="font-medium underline-offset-4 hover:underline">
-                    {title}
-                  </Link>
-                ) : (
-                  <span className="font-medium text-muted-foreground">{title}</span>
-                )}
+                <Link href={href} className="font-medium underline-offset-4 hover:underline">
+                  {title}
+                </Link>
                 <Badge variant={BADGE[step.status]}>{ts.statuses[step.status]}</Badge>
               </div>
               <p className="text-sm text-muted-foreground">{detail}</p>

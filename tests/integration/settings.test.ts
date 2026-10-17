@@ -448,8 +448,8 @@ describe("settings and spaces (phase 2)", () => {
         eventTypes: "done",
         paymentMethods: "done",
         policies: "done",
-        services: "unavailable",
-        packages: "unavailable",
+        services: "missing",
+        packages: "missing",
       });
       expect((await bookingReadiness(handle.db, owner.actor.venueId)).gaps).toEqual(["pricedPackage"]);
 

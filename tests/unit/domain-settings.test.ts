@@ -232,12 +232,12 @@ describe("guided setup checklist (UF-02, D-71)", () => {
     activePaymentMethods: 0,
     cancellationTiers: 0,
     activeStaff: 0,
-    activeServices: null,
-    pricedPackages: null,
+    activeServices: 0,
+    pricedPackages: 0,
   };
   const status = (facts: SetupFacts) => Object.fromEntries(setupChecklist(facts).steps.map((s) => [s.key, s.status]));
 
-  it("a new venue: only timing is done; seasons and staff are optional; catalog steps await phase 3", () => {
+  it("a new venue: only timing is done; seasons and staff are optional; services and packages are required", () => {
     expect(status(empty)).toEqual({
       venue: "missing",
       spaces: "missing",
@@ -245,8 +245,8 @@ describe("guided setup checklist (UF-02, D-71)", () => {
       seasons: "optional",
       eventTypes: "missing",
       paymentMethods: "missing",
-      services: "unavailable",
-      packages: "unavailable",
+      services: "missing",
+      packages: "missing",
       policies: "missing",
       staff: "optional",
     });
@@ -283,7 +283,7 @@ describe("guided setup checklist (UF-02, D-71)", () => {
     expect(setupChecklist({ ...full, cancellationTiers: 0 }).complete).toBe(false);
   });
 
-  it("is never complete while services and packages are unavailable (P2-10)", () => {
+  it("is not complete without an active service and a priced package (D-71, D-77)", () => {
     const allButCatalog: SetupFacts = {
       ...empty,
       venue: { name: "قاعة", phone: "1", address: "2" },
@@ -293,10 +293,13 @@ describe("guided setup checklist (UF-02, D-71)", () => {
       cancellationTiers: 1,
     };
     expect(setupChecklist(allButCatalog).complete).toBe(false);
+    expect(setupChecklist({ ...allButCatalog, activeServices: 1 }).complete).toBe(false);
+    expect(setupChecklist({ ...allButCatalog, pricedPackages: 1 }).complete).toBe(false);
+    expect(setupChecklist({ ...allButCatalog, activeServices: 1, pricedPackages: 1 }).complete).toBe(true);
   });
 
   it("BR-21 (5), UF-02 step 3: an active space, a priced package and the tiers are required to confirm", () => {
-    expect(bookingReadinessGaps({ activeSpaces: 0, pricedPackages: null, cancellationTiers: 0 })).toEqual([
+    expect(bookingReadinessGaps({ activeSpaces: 0, pricedPackages: 0, cancellationTiers: 0 })).toEqual([
       "activeSpace",
       "pricedPackage",
       "cancellationTiers",

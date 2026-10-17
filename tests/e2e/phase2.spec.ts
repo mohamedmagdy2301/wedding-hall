@@ -39,8 +39,8 @@ test("the owner's guided setup shows what is missing and fills up as they config
   }
   await expect(step(page, "timing")).toHaveAttribute("data-status", "done");
   await expect(step(page, "timing")).toContainText("60");
-  await expect(step(page, "services")).toHaveAttribute("data-status", "unavailable");
-  await expect(step(page, "packages")).toHaveAttribute("data-status", "unavailable");
+  await expect(step(page, "services")).toHaveAttribute("data-status", "missing");
+  await expect(step(page, "packages")).toHaveAttribute("data-status", "missing");
 
   // Venue data.
   await step(page, "venue").getByRole("link").click();
@@ -105,7 +105,7 @@ test("the owner's guided setup shows what is missing and fills up as they config
   await page.getByRole("dialog").getByRole("button", { name: "حفظ" }).click();
   await expect(page.getByTestId("list-row").filter({ hasText: "نقدي" })).toBeVisible();
 
-  // The checklist reflects it; services and packages wait for phase 3, so the card stays.
+  // The checklist reflects it; services and packages are still missing, so the card stays (phase 3 spec).
   await page.goto("/setup");
   for (const key of ["venue", "spaces", "eventTypes", "paymentMethods", "policies"]) {
     await expect(step(page, key)).toHaveAttribute("data-status", "done");

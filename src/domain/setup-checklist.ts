@@ -18,8 +18,8 @@ export const SETUP_STEPS = [
 
 export type SetupStepKey = (typeof SETUP_STEPS)[number];
 
-/** done; missing (required); optional (not done, not required); unavailable (a later phase). */
-export type SetupStepStatus = "done" | "missing" | "optional" | "unavailable";
+/** done; missing (required); optional (not done, not required). */
+export type SetupStepStatus = "done" | "missing" | "optional";
 
 export type SetupFacts = {
   venue: { name: string; phone: string | null; address: string | null };
@@ -30,9 +30,9 @@ export type SetupFacts = {
   cancellationTiers: number;
   /** Active non-owner staff members. */
   activeStaff: number;
-  /** Services and packages come in phase 3 (P2-10): null until then. */
-  activeServices: number | null;
-  pricedPackages: number | null;
+  activeServices: number;
+  /** Active packages on an active space with a regular price for at least one slot (D-77, D-78). */
+  pricedPackages: number;
 };
 
 export type SetupStep = { key: SetupStepKey; status: SetupStepStatus; required: boolean };
@@ -41,7 +41,7 @@ const OPTIONAL: ReadonlySet<SetupStepKey> = new Set(["seasons", "staff"]);
 
 const filled = (text: string | null) => (text ?? "").trim().length > 0;
 
-function isDone(key: SetupStepKey, f: SetupFacts): boolean | null {
+function isDone(key: SetupStepKey, f: SetupFacts): boolean {
   switch (key) {
     case "venue":
       return filled(f.venue.name) && filled(f.venue.phone) && filled(f.venue.address);
@@ -57,9 +57,9 @@ function isDone(key: SetupStepKey, f: SetupFacts): boolean | null {
     case "paymentMethods":
       return f.activePaymentMethods > 0;
     case "services":
-      return f.activeServices === null ? null : f.activeServices > 0;
+      return f.activeServices > 0;
     case "packages":
-      return f.pricedPackages === null ? null : f.pricedPackages > 0;
+      return f.pricedPackages > 0;
     case "policies":
       // Only the cancellation tiers are mandatory (D-60, D-67); the rest have defaults.
       return f.cancellationTiers > 0;
@@ -72,7 +72,7 @@ export function setupChecklist(facts: SetupFacts): { steps: SetupStep[]; complet
   const steps = SETUP_STEPS.map((key): SetupStep => {
     const required = !OPTIONAL.has(key);
     const done = isDone(key, facts);
-    const status: SetupStepStatus = done === null ? "unavailable" : done ? "done" : required ? "missing" : "optional";
+    const status: SetupStepStatus = done ? "done" : required ? "missing" : "optional";
     return { key, status, required };
   });
   return { steps, complete: steps.every((s) => s.status === "done" || s.status === "optional") };
@@ -84,7 +84,7 @@ export type BookingReadinessGap = "activeSpace" | "pricedPackage" | "cancellatio
 export function bookingReadinessGaps(facts: Pick<SetupFacts, "activeSpaces" | "pricedPackages" | "cancellationTiers">) {
   const gaps: BookingReadinessGap[] = [];
   if (facts.activeSpaces === 0) gaps.push("activeSpace");
-  if (!facts.pricedPackages) gaps.push("pricedPackage");
+  if (facts.pricedPackages === 0) gaps.push("pricedPackage");
   if (facts.cancellationTiers === 0) gaps.push("cancellationTiers");
   return gaps;
 }
