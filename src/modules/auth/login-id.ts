@@ -4,17 +4,9 @@
  * Pure; shared by login, user management and the setup scripts.
  */
 
+import { toAsciiDigits } from "@/lib/digits";
+
 export type LoginId = { kind: "phone" | "username"; value: string };
-
-const ARABIC_INDIC = "٠١٢٣٤٥٦٧٨٩";
-const EXTENDED_ARABIC_INDIC = "۰۱۲۳۴۵۶۷۸۹";
-
-function toAsciiDigits(input: string): string {
-  return input.replace(/[٠-٩۰-۹]/g, (d) => {
-    const i = ARABIC_INDIC.indexOf(d);
-    return String(i >= 0 ? i : EXTENDED_ARABIC_INDIC.indexOf(d));
-  });
-}
 
 /**
  * Egyptian mobile in any common spelling (spaces, dashes, Arabic digits, +20 / 0020 / 20
