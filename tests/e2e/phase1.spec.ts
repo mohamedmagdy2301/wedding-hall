@@ -56,9 +56,17 @@ test("the owner signs in with the temporary password and must change it first (S
   await page.goto("/staff");
   await expect(page).toHaveURL(/\/change-password$/);
 
+  // On the home page the shell re-issues the session cookie with the slid expiry (T-17).
+  const cookieRefresh = page.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" && "next-action" in r.request().headers() && new URL(r.url()).pathname === "/",
+  );
   await changeTemporaryPassword(page, E2E_TEMP_PASSWORD, NEW_PASSWORD);
   await expect(page.getByTestId("welcome")).toContainText(owner.name);
   await expect(page.getByRole("link", { name: E2E_VENUE_NAME })).toBeVisible();
+  const refresh = await cookieRefresh;
+  expect(refresh.status()).toBe(200);
+  expect(await refresh.headerValue("set-cookie")).toContain("wh_session=");
 });
 
 test("the owner adds a reception employee; dialog and menus render RTL (UF-11, P1-05)", async ({ page }, info) => {
@@ -124,4 +132,45 @@ test("the reception employee cannot open the staff screen (SEC-10)", async ({ pa
   await signOut(page);
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
+});
+
+/**
+ * SEC-22: Server Actions are protected against CSRF by Next.js comparing Origin with Host.
+ * A real login request is captured, then replayed with valid credentials twice: from the
+ * site's own origin it signs in; from a foreign origin it is refused and creates no session.
+ */
+test("a Server Action from a foreign Origin is refused (SEC-22)", async ({ page, baseURL }, info) => {
+  const login = `reception.${info.project.name}`;
+  await page.goto("/login");
+  await page.getByLabel("رقم الموبايل أو اسم المستخدم").fill(login);
+  await page.getByLabel("كلمة المرور").fill(NEW_PASSWORD);
+  const captured = page.waitForRequest((r) => r.method() === "POST" && "next-action" in r.headers());
+  await page.getByRole("button", { name: "دخول" }).click();
+  const request = await captured;
+  await expect(page).toHaveURL(/\/$/);
+  await signOut(page);
+
+  const headers = await request.allHeaders();
+  const replay = (origin: string) =>
+    page.request.post(request.url(), {
+      headers: {
+        "next-action": headers["next-action"],
+        "next-router-state-tree": headers["next-router-state-tree"] ?? "",
+        "content-type": headers["content-type"],
+        accept: headers.accept ?? "text/x-component",
+        origin,
+      },
+      data: request.postData() ?? "",
+      maxRedirects: 0,
+    });
+  const sessionCookieSet = (r: Awaited<ReturnType<typeof replay>>) =>
+    r.headersArray().some((h) => h.name.toLowerCase() === "set-cookie" && h.value.startsWith("wh_session="));
+
+  const sameOrigin = await replay(new URL(baseURL!).origin);
+  expect(sameOrigin.status()).toBe(200);
+  expect(sessionCookieSet(sameOrigin)).toBe(true);
+
+  const foreign = await replay("https://evil.example");
+  expect(foreign.ok()).toBe(false);
+  expect(sessionCookieSet(foreign)).toBe(false);
 });
