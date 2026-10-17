@@ -15,3 +15,13 @@ export const E2E_OWNERS = {
   mobile: { login: "owner.m", name: "مالك الموبايل" },
 } as const;
 export const E2E_TEMP_PASSWORD = "e2e-temp-pass-1";
+
+/**
+ * Phase 2 accounts per project, created ready to use (no temporary password) so the
+ * settings journeys do not depend on the phase 1 spec having run first.
+ */
+export const E2E_P2_PASSWORD = "e2e-phase2-pass-1";
+export const E2E_P2_USERS = {
+  desktop: { owner: "p2.owner", manager: "p2.manager", reception: "p2.reception" },
+  mobile: { owner: "p2.owner.m", manager: "p2.manager.m", reception: "p2.reception.m" },
+} as const;
