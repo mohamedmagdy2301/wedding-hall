@@ -36,6 +36,13 @@
       "when": 1792274662761,
       "tag": "0004_catalog_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792282512120,
+      "tag": "0005_customers_bookings",
+      "breakpoints": true
     }
   ]
 }

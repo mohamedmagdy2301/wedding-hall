@@ -545,6 +545,9 @@ export const ar = {
       amountTooLarge: "المبلغ أكبر من الحد المسموح.",
       negativeTotal: "الإجمالي مينفعش يبقى بالسالب: قيمة الخدمات المُزالة أكبر من السعر (BR-35).",
       discountExceedsSubtotal: "الخصم أكبر من الإجمالي قبل الخصم (BR-52).",
+      // Bookings (phase 5).
+      slotTaken: "الموعد ده اتحجز مؤكد لحجز تاني (BR-11). حدّث الصفحة واختار موعد تاني.",
+      bookingNotTentative: "الحجز ده مش مبدئي.",
     },
   },
 } as const;
