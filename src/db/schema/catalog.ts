@@ -127,6 +127,9 @@ export const packageItems = pgTable(
     quantity: integer("quantity").notNull().default(1),
     removable: boolean("removable").notNull().default(false),
     removalCredit: piasters("removal_credit").notNull().default(0),
+    // The package's order of its included services (D-116): rows saved in one transaction
+    // share `created_at`, so it cannot order them.
+    sortOrder: integer("sort_order").notNull().default(0),
     ...timestamps,
   },
   (t) => [

@@ -301,7 +301,7 @@ export async function getBookingFormOptions(db: DbOrTx, actor: SessionUser) {
             })
             .from(packageItems)
             .where(inArray(packageItems.packageId, ids))
-            .orderBy(asc(packageItems.createdAt)),
+            .orderBy(asc(packageItems.sortOrder)),
         ]);
   return {
     spaces: spaceRows,

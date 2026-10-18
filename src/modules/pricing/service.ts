@@ -77,7 +77,7 @@ async function readCatalog(db: DbOrTx, venueId: string, input: QuoteInput): Prom
       })
       .from(packageItems)
       .where(eq(packageItems.packageId, input.packageId))
-      .orderBy(asc(packageItems.createdAt)),
+      .orderBy(asc(packageItems.sortOrder)),
     db
       .select({ id: seasons.id, startDate: seasons.startDate, endDate: seasons.endDate })
       .from(seasons)

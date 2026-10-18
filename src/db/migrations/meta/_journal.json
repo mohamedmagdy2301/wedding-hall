@@ -43,6 +43,13 @@
       "when": 1792282512120,
       "tag": "0005_customers_bookings",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792295226313,
+      "tag": "0006_package_items_order",
+      "breakpoints": true
     }
   ]
 }

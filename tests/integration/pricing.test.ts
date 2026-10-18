@@ -165,6 +165,46 @@ describe("pricing.quote (phase 4)", () => {
     expect(ok(await s.quote(swap)).total).toBe(5_800_000);
   });
 
+  it("D-116: included services keep the package's order — on every read, and after a save that reorders them", async () => {
+    const s = await scenario();
+    const names = new Map(Object.entries(s.S).map(([k, v]) => [v, k]));
+    const includedOrder = async () => {
+      const b = ok(await s.quote());
+      return b.lines
+        .filter((l: { source: string }) => l.source === "package")
+        .map((l: { serviceId: string }) => names.get(l.serviceId));
+    };
+    // Saved in one transaction, so created_at is the same for all four (the PQ-01 flake).
+    for (let i = 0; i < 10; i += 1) expect(await includedOrder()).toEqual(["DJ", "PHOTO", "ZAFFA", "WELCOME"]);
+
+    const pkg = (await getPackage(db, s.manager.actor, s.gold)).package;
+    ok(
+      await s.call(catalogSpecs.updatePackage, {
+        packageId: s.gold,
+        version: pkg.version,
+        name: "الذهبي",
+        description: "",
+        baseGuests: "200",
+        extraGuestPrice: "150",
+        isActive: true,
+        prices: pkg.prices.map((p) => ({ ...p, price: String(p.price / 100) })),
+        items: [...pkg.items].reverse().map((i) => ({
+          serviceId: i.serviceId,
+          quantity: String(i.quantity),
+          removable: i.removable,
+          removalCredit: i.removable ? String(i.removalCredit / 100) : "",
+        })),
+      }),
+    );
+    expect(await includedOrder()).toEqual(["WELCOME", "ZAFFA", "PHOTO", "DJ"]);
+    expect((await getPackage(db, s.manager.actor, s.gold)).package.items.map((i) => names.get(i.serviceId))).toEqual([
+      "WELCOME",
+      "ZAFFA",
+      "PHOTO",
+      "DJ",
+    ]);
+  });
+
   it("PQ-01: engine refusals come back with their rule and the service as the field", async () => {
     const s = await scenario();
     expect(await s.quote({ removedServiceIds: [s.S.ZAFFA] })).toMatchObject({

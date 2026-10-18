@@ -83,8 +83,8 @@
 قيد فريد: `(package_id, slot_kind, season_id)` بـ `NULLS NOT DISTINCT` (السعر العادي `season_id = null` مرة واحدة لكل فترة). `price > 0`. سعر الموسم لفترة يتطلب سعرًا عاديًا لنفس الفترة (D-78).
 
 ### package_items
-`id, venue_id, package_id, service_id, quantity int, removable bool, removal_credit bigint`
-قيد فريد: `(package_id, service_id)` (D-80). `quantity` 1–10000، و = 1 للخدمة الثابتة وبالفرد (يُفحص في الكود). `removal_credit ≥ 0` و = 0 إن لم تكن `removable` (D-79).
+`id, venue_id, package_id, service_id, quantity int, removable bool, removal_credit bigint, sort_order int`
+قيد فريد: `(package_id, service_id)` (D-80). `sort_order` = ترتيب البند في الباكيج كما حُفظ، وكل قراءة بترتيبه (D-116). `quantity` 1–10000، و = 1 للخدمة الثابتة وبالفرد (يُفحص في الكود). `removal_credit ≥ 0` و = 0 إن لم تكن `removable` (D-79).
 
 > الأسعار والبنود تُحفظ مع الباكيج كمجموعة واحدة (D-81). الحجوزات لا تشير إلى صفوفهما بل تنسخ ما تحتاجه (BR-37). الخدمات والباكيجات لا تُحذف؛ التعطيل فقط (D-82).
 

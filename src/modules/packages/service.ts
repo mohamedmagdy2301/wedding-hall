@@ -72,7 +72,7 @@ async function readChildren(db: DbOrTx, packageIds: string[]) {
       })
       .from(packageItems)
       .where(inArray(packageItems.packageId, packageIds))
-      .orderBy(asc(packageItems.createdAt)),
+      .orderBy(asc(packageItems.sortOrder)),
   ]);
   return { prices, items };
 }
@@ -297,6 +297,7 @@ async function syncChildren(tx: Tx, venueId: string, packageId: string, next: Pa
       quantity: packageItems.quantity,
       removable: packageItems.removable,
       removalCredit: packageItems.removalCredit,
+      sortOrder: packageItems.sortOrder,
     })
     .from(packageItems)
     .where(eq(packageItems.packageId, packageId));
@@ -304,17 +305,22 @@ async function syncChildren(tx: Tx, venueId: string, packageId: string, next: Pa
   const nextServices = new Set(next.items.map((i) => i.serviceId));
   const removedItems = storedItems.filter((i) => !nextServices.has(i.serviceId)).map((i) => i.id);
   if (removedItems.length > 0) await tx.delete(packageItems).where(inArray(packageItems.id, removedItems));
-  for (const item of next.items) {
+  // The items keep the order they were sent in (D-116).
+  for (const [sortOrder, item] of next.items.entries()) {
     const current = byService.get(item.serviceId);
     if (!current) {
-      await tx.insert(packageItems).values({ venueId, packageId, ...item });
+      await tx.insert(packageItems).values({ venueId, packageId, ...item, sortOrder });
     } else if (
       current.quantity !== item.quantity ||
       current.removable !== item.removable ||
-      current.removalCredit !== item.removalCredit
+      current.removalCredit !== item.removalCredit ||
+      current.sortOrder !== sortOrder
     ) {
       const { quantity, removable, removalCredit } = item;
-      await tx.update(packageItems).set({ quantity, removable, removalCredit }).where(eq(packageItems.id, current.id));
+      await tx
+        .update(packageItems)
+        .set({ quantity, removable, removalCredit, sortOrder })
+        .where(eq(packageItems.id, current.id));
     }
   }
 }
