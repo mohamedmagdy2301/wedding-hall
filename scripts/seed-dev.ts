@@ -1,5 +1,6 @@
 import { addDays, cairoDate } from "../src/lib/time";
 import type { SessionUser } from "../src/modules/auth/sessions";
+import { confirmBooking } from "../src/modules/bookings/confirm";
 import { createTentative } from "../src/modules/bookings/service";
 import { createService, type ServiceInput } from "../src/modules/catalog/services";
 import { createPackage, type PackageFields } from "../src/modules/packages/service";
@@ -20,7 +21,8 @@ import { fail, scriptDeps } from "./lib/services";
  * through the same services as the app; `--bare` stops after the venue, to walk through
  * the guided setup (S-14) from scratch.
  * Phase 5 adds demo tentative bookings (one expired, two on the same slot, two customers
- * with one number — D-28). Never confirmed ones: confirming is phase 6 (D-97).
+ * with one number — D-28); phase 6 two confirmed ones with their deposit, one with a
+ * schedule whose first installment is overdue (P6-12), through bookings.confirm.
  */
 async function seedDemoSettings(deps: ServiceDeps, owner: SessionUser) {
   await updateVenue(deps, owner, { name: "قاعة تجريبية", phone: "0221234567", address: "مدينة نصر، القاهرة" });
@@ -57,6 +59,83 @@ async function seedDemoSettings(deps: ServiceDeps, owner: SessionUser) {
   const spaces = { big: big.id, small: small.id, roof: roof.id };
   const packages = await seedDemoCatalog(deps, owner, spaces, summer.id);
   await seedDemoBookings(deps, owner, spaces, packages);
+  await seedDemoConfirmed(deps, owner, spaces, packages);
+}
+
+/** Confirmed bookings through the same service as the app (D-97), with deposits and a schedule. */
+async function seedDemoConfirmed(
+  deps: ServiceDeps,
+  owner: SessionUser,
+  spaces: { big: string; small: string; roof: string },
+  packages: Record<string, string>,
+) {
+  const today = cairoDate(deps.now);
+  const eventTypes = await listItems(deps.db, owner, "eventTypes");
+  const typeId = (name: string) => eventTypes.find((e) => e.name === name)?.id ?? null;
+  const [method] = (await listItems(deps.db, owner, "paymentMethods")).filter((m) => m.isActive);
+  const confirmed = async (
+    input: Pick<Parameters<typeof createTentative>[2], "spaceId" | "eventDate" | "slotKind" | "packageId" | "guests">,
+    customer: { name: string; phone: string },
+    names: { groomName: string | null; brideName: string | null; eventType: string },
+    schedule: (total: number, deposit: number) => { dueDate: string; amount: number }[],
+  ) => {
+    const tentative = await createTentative(deps, owner, {
+      startTime: null,
+      endTime: null,
+      notes: null,
+      items: [],
+      removedServiceIds: [],
+      ...input,
+      ...names,
+      eventTypeId: typeId(names.eventType),
+      customer: { ...customer, altPhone: null },
+    });
+    const row = await deps.db.query.bookings.findFirst({
+      columns: { total: true },
+      where: (b, { eq }) => eq(b.id, tentative.id),
+    });
+    const total = row!.total!;
+    const deposit = Math.round(total / 4);
+    await confirmBooking(deps, owner, {
+      bookingId: tentative.id,
+      version: tentative.version,
+      expectedTotal: total,
+      deposit: { amount: deposit, methodId: method.id, paidAt: null },
+      installments: schedule(total, deposit),
+    });
+  };
+
+  // Its first installment fell due three days ago: overdue in collections (BR-66).
+  await confirmed(
+    {
+      spaceId: spaces.big,
+      eventDate: addDays(today, 45),
+      slotKind: "evening",
+      packageId: packages["الباكيج الفضي"],
+      guests: 300,
+    },
+    { name: "هاني فؤاد", phone: "01006667788" },
+    { groomName: "هاني", brideName: "نورا", eventType: "فرح" },
+    (total, deposit) => {
+      const first = Math.round(total / 3);
+      return [
+        { dueDate: addDays(today, -3), amount: first },
+        { dueDate: addDays(today, 40), amount: total - deposit - first },
+      ];
+    },
+  );
+  await confirmed(
+    {
+      spaceId: spaces.small,
+      eventDate: addDays(today, 60),
+      slotKind: "day",
+      packageId: packages["باكيج الخطوبة"],
+      guests: 120,
+    },
+    { name: "منة الله سمير", phone: "01117778899" },
+    { groomName: null, brideName: null, eventType: "خطوبة" },
+    () => [],
+  );
 }
 
 /** Tentative bookings through the same service as the wizard, dated from today. */
