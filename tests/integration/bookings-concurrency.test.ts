@@ -76,7 +76,8 @@ describe("concurrent confirmations (BR-11, D-97)", () => {
 
   it("C-01: two tentative bookings on one slot confirmed at the same moment → exactly one succeeds (20 runs)", async () => {
     const w = await bookingWorld(first);
-    // Deadlocks between the two are retried (D-113); the loser must still get the real verdict.
+    // Confirmations of one space queue on its advisory lock (D-115), so no deadlock is left
+    // for runTransaction to retry (D-113); the loser gets the constraint's verdict.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     for (let run = 0; run < 20; run += 1) {
       const date = addDays("2027-02-01", run * 2);
@@ -99,6 +100,7 @@ describe("concurrent confirmations (BR-11, D-97)", () => {
     const retried = warn.mock.calls.filter((c) => String(c[0]).startsWith("transaction retried")).length;
     warn.mockRestore();
     console.info(`C-01: ${retried} deadlock retries in 20 runs; every loser got CONFLICT_SLOT_TAKEN`);
+    expect(retried).toBe(0);
   });
 
   it("C-02: while the first confirmation is uncommitted the second waits, then fails when the first commits", async () => {
