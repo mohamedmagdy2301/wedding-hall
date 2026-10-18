@@ -35,39 +35,36 @@ describe("the schedule, collections and the remaining amount (BR-65, BR-66, D-12
   const replace = (s: PaymentScenario, bookingId: string, amount: string, extra = {}) =>
     s.call(paymentSpecs.recordDeposit, { bookingId, amount, methodId: s.cash, ...extra });
 
-  it("I-07: a replacement of 10,000 — the last installment grows by 5,000", async () => {
+  it("I-07 / R6-02: a replacement of 10,000 — the last installment grows by 5,000; below the 15,000 minimum it is accepted with a warning", async () => {
     const s = await paymentScenario(handle);
     const a = await withoutDeposit(s);
     const result = ok(await replace(s, a.id, "10,000"));
-    expect(result.receiptNo).toBe("000002");
+    expect(result).toMatchObject({ receiptNo: "000002", belowMinimum: true, minimum: p("15,000") });
     expect(await schedule(a.id)).toEqual([p("20,000"), p("30,000")]);
   });
 
-  it("I-08 / I-09: 35,000 takes 20,000 off the last one; 45,000 leaves the last at 0.01 and takes the rest from the one before", async () => {
+  it("I-08 / I-09: 35,000 takes 20,000 off the last one; 45,000 covers the last one entirely — it leaves, and one installment of 15,000 stays (R6-01)", async () => {
     const s = await paymentScenario(handle);
     const a = await withoutDeposit(s);
-    ok(await replace(s, a.id, "35,000"));
+    expect(ok(await replace(s, a.id, "35,000")).belowMinimum).toBe(false);
     expect(await schedule(a.id)).toEqual([p("20,000"), p("5,000")]);
 
     const b = await s.confirmed("15,000", I01, { eventDate: "2027-04-15" });
     ok(await s.call(paymentSpecs.void, { paymentId: b.depositId, reason: "الشيك رجع" }, s.owner.token));
     ok(await replace(s, b.id, "45,000"));
-    expect(await schedule(b.id)).toEqual([p("14,999.99"), p("0.01")]);
+    const rows = await db.select().from(installments).where(eq(installments.bookingId, b.id));
+    expect(rows.map((l) => [l.dueDate, l.amount])).toEqual([["2027-01-15", p("15,000")]]);
   });
 
-  it("I-10: 60,000 cannot be absorbed without an installment reaching zero → refused, nothing written; with an empty schedule it is accepted", async () => {
+  it("I-10: 60,000 covers every installment — the schedule empties; only more than the remaining amount is refused (BR-63)", async () => {
     const s = await paymentScenario(handle);
     const a = await withoutDeposit(s);
-    expect(failed(await replace(s, a.id, "60,000"))).toMatchObject({
+    expect(failed(await replace(s, a.id, "60,000.01"))).toMatchObject({
       code: "BUSINESS_RULE_VIOLATION",
-      rule: "D-121",
-      fieldErrors: { installments: expect.any(String) },
+      rule: "BR-63",
     });
     expect(await schedule(a.id)).toEqual([p("20,000"), p("25,000")]);
-    const page = ok(await s.call(bookingSpecs.get, { bookingId: a.id }));
-    expect(page.money.payments).toHaveLength(1);
-
-    ok(await replace(s, a.id, "60,000", { installments: [] }));
+    ok(await replace(s, a.id, "60,000"));
     expect(await schedule(a.id)).toEqual([]);
   });
 

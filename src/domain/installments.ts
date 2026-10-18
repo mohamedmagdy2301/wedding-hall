@@ -45,13 +45,14 @@ export function scheduleViolation(input: {
 }
 
 /**
- * D-121 (with the product owner's addition): the schedule adjusted in the same operation so
+ * D-121 (with the product owner's decisions): the schedule adjusted in the same operation so
  * that its sum becomes `targetSum` (total − the new deposit). An increase goes on the last
- * installment; a decrease comes off the newest first, then the ones before it, and no
- * installment drops below one piaster. `null` when that cannot reach the target — the staff
- * member then edits the schedule.
+ * installment; a decrease comes off the newest first: an installment the decrease covers
+ * entirely leaves the schedule, the one it covers in part shrinks — no installment of one
+ * piaster. `null` only when the target is below zero, which BR-63 already refuses.
  */
 export function rebalanceSchedule<T extends ScheduleLine>(lines: readonly T[], targetSum: number): T[] | null {
+  if (targetSum < 0) return null;
   const sorted = sortSchedule(lines);
   if (sorted.length === 0) return targetSum === 0 ? [] : null;
   const delta = targetSum - scheduleSum(sorted);
@@ -61,12 +62,17 @@ export function rebalanceSchedule<T extends ScheduleLine>(lines: readonly T[], t
     return result;
   }
   let toRemove = -delta;
-  for (let i = result.length - 1; i >= 0 && toRemove > 0; i -= 1) {
-    const take = Math.min(toRemove, result[i].amount - 1);
-    result[i].amount -= take;
-    toRemove -= take;
+  while (toRemove > 0) {
+    const last = result[result.length - 1];
+    if (last.amount <= toRemove) {
+      toRemove -= last.amount;
+      result.pop();
+    } else {
+      last.amount -= toRemove;
+      toRemove = 0;
+    }
   }
-  return toRemove === 0 ? result : null;
+  return result;
 }
 
 export type InstallmentState = "paid" | "upcoming" | "dueToday" | "overdue";

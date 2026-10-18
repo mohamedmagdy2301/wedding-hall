@@ -173,7 +173,7 @@ describe("the installment schedule (BR-65, D-33)", () => {
   });
 });
 
-describe("a replacement deposit rebalances the schedule (D-121, with the product owner's addition)", () => {
+describe("a replacement deposit rebalances the schedule (D-121, with the product owner's decisions)", () => {
   const amounts = (lines: ScheduleLine[] | null) => lines?.map((l) => l.amount) ?? null;
   const target = (deposit: string) => TOTAL - p(deposit);
 
@@ -185,13 +185,14 @@ describe("a replacement deposit rebalances the schedule (D-121, with the product
     expect(amounts(rebalanceSchedule(I01, target("35,000")))).toEqual([p("20,000"), p("5,000")]);
   });
 
-  it("I-09: 45,000 — 30,000 is more than the last one: it stops at 0.01 and the rest comes off the one before", () => {
-    expect(amounts(rebalanceSchedule(I01, target("45,000")))).toEqual([p("14,999.99"), p("0.01")]);
+  it("I-09: 45,000 — the last installment (25,000) is covered entirely and leaves; the first shrinks by 5,000 to one installment of 15,000", () => {
+    expect(rebalanceSchedule(I01, target("45,000"))).toEqual([{ dueDate: "2027-01-15", amount: p("15,000") }]);
   });
 
-  it("I-10: 60,000 — the installments cannot reach zero: refused; an empty schedule is fine", () => {
-    expect(rebalanceSchedule(I01, target("60,000"))).toBeNull();
+  it("I-10: 60,000 — every installment is covered: the schedule empties (no installment of one piaster)", () => {
+    expect(rebalanceSchedule(I01, target("60,000"))).toEqual([]);
     expect(rebalanceSchedule([], target("60,000"))).toEqual([]);
+    expect(rebalanceSchedule(I01, -1)).toBeNull(); // above the total: BR-63 refuses it first
   });
 
   it("the order is by due date whatever order the lines come in, and dates are kept", () => {

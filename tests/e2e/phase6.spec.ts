@@ -280,7 +280,7 @@ test("P6-E2: the wizard saves a booking confirmed at once with its deposit (BR-2
   await expect(page.getByTestId("booking-status")).toHaveText("مؤكد");
 });
 
-test("P6-E3: the manager voids the deposit, the booking stays confirmed with a warning, and a replacement deposit clears it (BR-64, D-40, D-121)", async ({
+test("P6-E3: the manager voids the deposit, the booking stays confirmed with a warning, and a replacement deposit below the minimum is warned about and clears it (BR-64, D-40, D-121, R6-02)", async ({
   page,
 }, info) => {
   await signIn(page, usersOf(info).manager);
@@ -297,6 +297,8 @@ test("P6-E3: the manager voids the deposit, the booking stays confirmed with a w
   await page.getByTestId("record-deposit").click();
   const replacement = page.getByTestId("record-deposit-dialog");
   await replacement.getByTestId("deposit-amount").fill("10000");
+  // Below the 25% minimum (15,000): a warning, not a block (R6-02).
+  await expect(replacement.getByTestId("below-minimum")).toBeVisible();
   await chooseMethod(page, replacement);
   // 5,000 more on the last installment (I-07).
   await expect(replacement.getByTestId("rebalance-preview")).toContainText("٣٠٬٠٠٠");

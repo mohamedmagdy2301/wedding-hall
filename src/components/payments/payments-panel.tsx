@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { minimumDeposit } from "@/domain/deposit";
 import { rebalanceSchedule, type InstallmentState } from "@/domain/installments";
 import { formatPiasters, parsePounds } from "@/domain/money";
 import type { PaymentKind } from "@/domain/payments";
@@ -366,6 +367,7 @@ function RecordDepositDialog(
   const errors = action.error?.fieldErrors ?? {};
   const deposit = parsePounds(amount);
   const total = props.money.ledger.total;
+  const minimum = minimumDeposit(total, props.options.minDeposit);
   const preview =
     props.money.installments.length > 0 && deposit !== null && deposit > 0
       ? rebalanceSchedule(props.money.installments, total - deposit)
@@ -406,6 +408,12 @@ function RecordDepositDialog(
         error={errors.amount}
         data-testid="deposit-amount"
       />
+      {deposit !== null && deposit > 0 && deposit < minimum && (
+        <Alert data-testid="below-minimum">
+          <AlertTriangle />
+          <AlertDescription>{fill(tp.belowMinimum, { amount: formatPiasters(minimum) })}</AlertDescription>
+        </Alert>
+      )}
       <MethodSelect methods={props.options.methods} value={methodId} onChange={setMethodId} error={errors.methodId} />
       {props.options.canBackdate && (
         <Field
@@ -418,19 +426,21 @@ function RecordDepositDialog(
       )}
       {props.money.installments.length > 0 && !manual && (
         <div className="grid gap-1 text-sm" data-testid="rebalance-preview">
-          {preview ? (
+          {preview && (
             <>
               <p className="text-muted-foreground">{tp.rebalanced}</p>
-              <ul className="ps-4">
-                {preview.map((l, i) => (
-                  <li key={i}>
-                    {formatIsoDate(l.dueDate)} — {formatPiasters(l.amount)}
-                  </li>
-                ))}
-              </ul>
+              {preview.length === 0 ? (
+                <p className="ps-4">{tp.noSchedule}</p>
+              ) : (
+                <ul className="ps-4">
+                  {preview.map((l, i) => (
+                    <li key={i}>
+                      {formatIsoDate(l.dueDate)} — {formatPiasters(l.amount)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
-          ) : (
-            deposit !== null && deposit > 0 && <p className="text-destructive">{tp.rebalanceImpossible}</p>
           )}
           <Button type="button" variant="link" className="justify-start px-0" onClick={() => setManual(true)}>
             {tp.editScheduleToo}

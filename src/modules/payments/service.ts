@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { bookings as bookingsTable, payments } from "@/db/schema";
 import { rebalanceSchedule, scheduleViolation, type ScheduleLine } from "@/domain/installments";
+import { minimumDeposit } from "@/domain/deposit";
 import { activeDeposit, exceedsTotal, netPaid, type PaymentKind } from "@/domain/payments";
 import { addYears, cairoDate, cairoInstant, cairoTimeOfDay } from "@/lib/time";
 import { recordAudit } from "@/modules/audit/service";
@@ -8,6 +9,7 @@ import type { SessionUser } from "@/modules/auth/sessions";
 import type { ServiceDeps } from "@/modules/shared/context";
 import type { Tx } from "@/modules/shared/db";
 import { AppError, forbidden, notFound } from "@/modules/shared/errors";
+import { readVenuePolicies } from "@/modules/settings/venue";
 import { runTransaction } from "@/modules/shared/transaction";
 import { assertAllowed, satisfies } from "@/modules/users-rbac/authorize";
 import {
@@ -167,9 +169,9 @@ export async function recordPayment(deps: ServiceDeps, actor: SessionUser, input
 
 /**
  * `payments.recordDeposit` (BR-60, D-40, D-121): a new deposit once the previous one was
- * voided, within the remaining amount (BR-63) — the minimum is for confirming only. A
- * schedule on the booking must still add up: rebalanced when none is sent, checked as sent
- * otherwise.
+ * voided, within the remaining amount (BR-63). Below the current minimum it is accepted and
+ * flagged (`belowMinimum` — R6-02). A schedule on the booking must still add up: rebalanced
+ * when none is sent (D-121), checked as sent otherwise.
  */
 export async function recordDeposit(deps: ServiceDeps, actor: SessionUser, input: RecordDepositInput) {
   assertAllowed(actor, "payments.record");
@@ -180,9 +182,14 @@ export async function recordDeposit(deps: ServiceDeps, actor: SessionUser, input
     assertTakesPayments(booking.status);
     const method = await activeMethodName(tx, venueId, input.methodId);
     const total = booking.total ?? 0;
-    const [rows, schedule] = await Promise.all([readLedgerRows(tx, booking.id), readSchedule(tx, booking.id)]);
+    const [rows, schedule, policies] = await Promise.all([
+      readLedgerRows(tx, booking.id),
+      readSchedule(tx, booking.id),
+      readVenuePolicies(tx, venueId),
+    ]);
     if (activeDeposit(rows)) throw new AppError("BUSINESS_RULE_VIOLATION", "depositExists", { rule: "BR-60" });
-    // The minimum is a condition of confirming (BR-21), not of a replacement (I-07).
+    // The minimum is a condition of confirming (BR-21); below it a replacement is only warned about (R6-02).
+    const minimum = minimumDeposit(total, policies);
     if (exceedsTotal(total, netPaid(rows), input.amount)) {
       throw new AppError("BUSINESS_RULE_VIOLATION", "overpayment", {
         rule: "BR-63",
@@ -196,14 +203,8 @@ export async function recordDeposit(deps: ServiceDeps, actor: SessionUser, input
       assertSchedule({ total, deposit: input.amount, eventDate, lines: input.installments });
       newSchedule = input.installments;
     } else if (schedule.length > 0) {
-      const rebalanced = rebalanceSchedule(schedule, total - input.amount);
-      if (!rebalanced) {
-        throw new AppError("BUSINESS_RULE_VIOLATION", "scheduleNeedsEdit", {
-          rule: "D-121",
-          fieldErrors: { installments: "scheduleNeedsEdit" },
-        });
-      }
-      newSchedule = rebalanced;
+      // Never null here: BR-63 above keeps the target at zero or more.
+      newSchedule = rebalanceSchedule(schedule, total - input.amount)!;
     }
 
     const payment = await insertPayment(tx, {
@@ -231,7 +232,13 @@ export async function recordDeposit(deps: ServiceDeps, actor: SessionUser, input
       await replaceSchedule(tx, venueId, booking.id, newSchedule);
       await auditSchedule(tx, actor, booking, schedule, newSchedule, input.installments ? "set" : "rebalanced");
     }
-    return { paymentId: payment.id, receiptNo: payment.receiptNo, installments: newSchedule ?? schedule };
+    return {
+      paymentId: payment.id,
+      receiptNo: payment.receiptNo,
+      installments: newSchedule ?? schedule,
+      belowMinimum: input.amount < minimum,
+      minimum,
+    };
   });
 }
 
