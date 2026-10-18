@@ -130,9 +130,18 @@ test("a stale package page cannot overwrite another save (D-81)", async ({ page,
   await expect(other.getByTestId("price-regular-evening")).toHaveValue("50000");
 
   // The first page keeps working on its new version.
+  // The note may still show the first save's text, so wait for this save's own response.
   await page.getByLabel("الوصف (اختياري)").fill("حفظ ثانٍ");
+  const secondSaved = page.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" &&
+      "next-action" in r.request().headers() &&
+      new URL(r.url()).pathname === new URL(page.url()).pathname,
+  );
   await page.getByRole("button", { name: "حفظ" }).click();
+  await secondSaved;
   await expect(page.getByTestId("saved-note")).toHaveText("تم الحفظ.");
+  await expect(page.getByTestId("package-conflict")).toHaveCount(0);
   await other.close();
 });
 

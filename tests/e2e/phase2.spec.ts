@@ -87,7 +87,16 @@ test("the owner's guided setup shows what is missing and fills up as they config
   await page.getByTestId("tier-1").getByLabel("قبل الحفلة بـ (يوم) أو أكثر").fill("30");
   await page.getByTestId("tier-1").getByLabel("يُرد (%)").fill("50");
   await expect(page.getByTestId("tier-preview")).toContainText("٥٠٪");
+  // Reloading before the save's response arrives would abort it (the note may still show the
+  // previous save's text, so it cannot tell).
+  const tiersSaved = page.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" &&
+      "next-action" in r.request().headers() &&
+      new URL(r.url()).pathname === "/settings/policies",
+  );
   await page.getByRole("button", { name: "حفظ" }).click();
+  await tiersSaved;
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.reload();
   // Shown with the most days first.
