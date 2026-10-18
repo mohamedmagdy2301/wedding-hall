@@ -10,8 +10,9 @@ import { quoteForVenue } from "@/modules/pricing/service";
 import { getTiming } from "@/modules/settings/venue";
 import type { ServiceDeps } from "@/modules/shared/context";
 import type { DbOrTx, Tx } from "@/modules/shared/db";
+import { runTransaction } from "@/modules/shared/transaction";
 import { AppError, notFound, validationError } from "@/modules/shared/errors";
-import { lockSpaceRow, readSpaces, type Space } from "@/modules/spaces/service";
+import { lockSpaceRow, readSpaceWithTiming, type Space } from "@/modules/spaces/service";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
 import { findOverlapping, nextBookingNumber } from "./repository";
 import type { BookingInput, UpdateDetailsInput, UpdateTentativeInput } from "./schemas";
@@ -32,11 +33,10 @@ const HOUR_MS = 60 * MINUTE_MS;
 export type OverlapWarning = { id: string; bookingNo: string; startsAt: Date; endsAt: Date };
 export type BookingWarnings = { confirmedConflicts: OverlapWarning[]; tentativeOverlaps: OverlapWarning[] };
 
-async function loadSpace(tx: Tx, venueId: string, spaceId: string): Promise<Space> {
+/** The space share-locked for the transaction (C-08), with its slots and the venue's timing. */
+async function loadSpace(tx: Tx, venueId: string, spaceId: string) {
   await lockSpaceRow(tx, venueId, spaceId, "share");
-  const [space] = await readSpaces(tx, venueId, [spaceId]);
-  if (!space) throw notFound("spaceNotFound");
-  return space;
+  return readSpaceWithTiming(tx, venueId, spaceId);
 }
 
 const TIME_ERRORS = {
@@ -242,10 +242,9 @@ export async function readBookingSnapshot(db: DbOrTx, venueId: string, bookingId
 export async function createTentative(deps: ServiceDeps, actor: SessionUser, input: BookingInput) {
   assertAllowed(actor, "bookings.create");
   const venueId = actor.venueId;
-  return deps.db.transaction(async (tx) => {
-    const space = await loadSpace(tx, venueId, input.spaceId);
+  return runTransaction(deps.db, async (tx) => {
+    const { space, timing } = await loadSpace(tx, venueId, input.spaceId);
     assertActiveSpace(space);
-    const timing = await getTiming(tx, venueId);
     const times = resolveTimes(space, input, timing.bufferMinutes);
     assertDateWindow(input.eventDate, times.startsAt, deps.now);
     await assertEventType(tx, venueId, input.eventTypeId, null);
@@ -353,14 +352,13 @@ const choiceKey = (items: { serviceId: string | null; quantity: number; isExtern
 export async function updateTentative(deps: ServiceDeps, actor: SessionUser, input: UpdateTentativeInput) {
   assertAllowed(actor, "bookings.edit");
   const venueId = actor.venueId;
-  return deps.db.transaction(async (tx) => {
+  return runTransaction(deps.db, async (tx) => {
     const current = await lockBooking(tx, venueId, input.bookingId, input.version);
     assertTentative(current.status);
     const before = await readBookingSnapshot(tx, venueId, current.id);
     const stored = await storedChoices(tx, current.id);
 
-    const space = await loadSpace(tx, venueId, input.spaceId);
-    const timing = await getTiming(tx, venueId);
+    const { space, timing } = await loadSpace(tx, venueId, input.spaceId);
     const times = resolveTimes(space, input, timing.bufferMinutes);
     const moved =
       input.spaceId !== current.spaceId ||
@@ -429,7 +427,7 @@ export async function extendTentative(
 ) {
   assertAllowed(actor, "bookings.edit");
   const venueId = actor.venueId;
-  return deps.db.transaction(async (tx) => {
+  return runTransaction(deps.db, async (tx) => {
     const current = await lockBooking(tx, venueId, input.bookingId, input.version);
     assertTentative(current.status);
     const before = await readBookingSnapshot(tx, venueId, current.id);
@@ -457,7 +455,7 @@ export async function extendTentative(
 export async function updateDetails(deps: ServiceDeps, actor: SessionUser, input: UpdateDetailsInput) {
   assertAllowed(actor, "bookings.edit");
   const venueId = actor.venueId;
-  return deps.db.transaction(async (tx) => {
+  return runTransaction(deps.db, async (tx) => {
     const current = await lockBooking(tx, venueId, input.bookingId, input.version);
     if (current.status === "cancelled") throw new AppError("BUSINESS_RULE_VIOLATION", "bookingCancelled");
     const before = await readBookingSnapshot(tx, venueId, current.id);

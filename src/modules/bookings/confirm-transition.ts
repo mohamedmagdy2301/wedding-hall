@@ -7,7 +7,8 @@ import { AppError, pgError, ruleViolation } from "@/modules/shared/errors";
 /**
  * The only place a booking becomes `confirmed` (D-97). The `bookings_no_overlap` constraint
  * decides (BR-11, BR-21 item 3): a clash is `CONFLICT_SLOT_TAKEN` and, since it runs inside
- * the caller's transaction, nothing of the confirmation is kept (BR-22).
+ * the caller's transaction, nothing of the confirmation is kept (BR-22). Callers run it inside
+ * `runTransaction`, which retries a deadlock (D-113).
  *
  * Phase 5 calls it from tests only: no Server Action or screen may import this file — an
  * ESLint rule and a unit test guard that (D-97). Phase 6's `bookings.confirm` wraps it with
@@ -47,12 +48,11 @@ export async function markConfirmed(tx: Tx, input: ConfirmTransitionInput): Prom
     if (!row) throw ruleViolation("BR-21", "bookingNotTentative");
     return row;
   } catch (error) {
-    // 23P01: the slot is taken by a committed confirmation. 40P01: two confirmations of
-    // clashing bookings arrived together and each waited for the other inside the
-    // constraint check; PostgreSQL aborts one of them (seen in C-01). Either way this one
-    // lost the slot, and its whole transaction is rolled back.
-    const { code } = pgError(error);
-    if (code === "23P01" || code === "40P01") {
+    // The slot is taken by a committed confirmation. A deadlock (two clashing confirmations
+    // waiting for each other inside the constraint check, seen in C-01) is not mapped here:
+    // the caller's runTransaction retries it and the constraint then gives the real verdict
+    // (D-113).
+    if (pgError(error).code === "23P01") {
       throw new AppError("CONFLICT_SLOT_TAKEN", "slotTaken", { rule: "BR-11" });
     }
     throw error;

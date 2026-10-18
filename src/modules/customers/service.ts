@@ -8,6 +8,7 @@ import type { SessionUser } from "@/modules/auth/sessions";
 import { overlapsConfirmedSql } from "@/modules/bookings/repository";
 import type { ServiceDeps } from "@/modules/shared/context";
 import type { DbOrTx, Tx } from "@/modules/shared/db";
+import { runTransaction } from "@/modules/shared/transaction";
 import { notFound } from "@/modules/shared/errors";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
 import type { CustomerFields } from "./schemas";
@@ -144,7 +145,7 @@ export async function insertCustomer(tx: Tx, venueId: string, actorId: string, f
 
 export async function createCustomer(deps: ServiceDeps, actor: SessionUser, input: CustomerFields) {
   assertAllowed(actor, "customers.manage");
-  const id = await deps.db.transaction((tx) => insertCustomer(tx, actor.venueId, actor.userId, input));
+  const id = await runTransaction(deps.db, (tx) => insertCustomer(tx, actor.venueId, actor.userId, input));
   return { id };
 }
 
@@ -154,7 +155,7 @@ export async function updateCustomer(
   input: CustomerFields & { customerId: string },
 ) {
   assertAllowed(actor, "customers.manage");
-  await deps.db.transaction(async (tx) => {
+  await runTransaction(deps.db, async (tx) => {
     const [before] = await tx
       .select(columns)
       .from(customers)

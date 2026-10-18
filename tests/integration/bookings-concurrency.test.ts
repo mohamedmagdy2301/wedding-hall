@@ -1,10 +1,11 @@
 import { eq, sql } from "drizzle-orm";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DbHandle } from "@/db/client";
 import { bookings } from "@/db/schema";
 import { addDays } from "@/lib/time";
 import { markConfirmed } from "@/modules/bookings/confirm-transition";
 import { AppError } from "@/modules/shared/errors";
+import { runTransaction } from "@/modules/shared/transaction";
 import { bookingWorld, insertRawBooking, TIERS, type World } from "./helpers/bookings";
 import { connectTestDb, truncateAll } from "./helpers/db";
 
@@ -51,8 +52,9 @@ describe("concurrent confirmations (BR-11, D-97)", () => {
     end: [addDays(date, 1), "01:00"] as [string, string],
   });
 
+  /** As phase 6's bookings.confirm will: inside runTransaction, so a deadlock is retried (D-113). */
   function confirmIn(handle: DbHandle, w: World, bookingId: string, beforeUpdate: () => Promise<void>) {
-    return handle.db.transaction(async (tx) => {
+    return runTransaction(handle.db, async (tx) => {
       await tx.execute(sql`SELECT 1`);
       await beforeUpdate();
       return markConfirmed(tx, {
@@ -74,6 +76,8 @@ describe("concurrent confirmations (BR-11, D-97)", () => {
 
   it("C-01: two tentative bookings on one slot confirmed at the same moment → exactly one succeeds (20 runs)", async () => {
     const w = await bookingWorld(first);
+    // Deadlocks between the two are retried (D-113); the loser must still get the real verdict.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     for (let run = 0; run < 20; run += 1) {
       const date = addDays("2027-02-01", run * 2);
       const t1 = await insertRawBooking(first, w, evening(date));
@@ -92,6 +96,9 @@ describe("concurrent confirmations (BR-11, D-97)", () => {
       expect((error as AppError).code).toBe("CONFLICT_SLOT_TAKEN");
       expect((await statuses([t1, t2])).sort()).toEqual(["confirmed", "tentative"]);
     }
+    const retried = warn.mock.calls.filter((c) => String(c[0]).startsWith("transaction retried")).length;
+    warn.mockRestore();
+    console.info(`C-01: ${retried} deadlock retries in 20 runs; every loser got CONFLICT_SLOT_TAKEN`);
   });
 
   it("C-02: while the first confirmation is uncommitted the second waits, then fails when the first commits", async () => {

@@ -10,6 +10,8 @@ export const ERROR_CODES = [
   "CONFLICT_SLOT_TAKEN",
   "CONCURRENT_MODIFICATION",
   "BUSINESS_RULE_VIOLATION",
+  // Transient: the database kept aborting the transaction for timing reasons (D-113).
+  "RETRY_LATER",
   // Not in API.md's list: an unexpected failure the user can only retry.
   "INTERNAL_ERROR",
 ] as const;

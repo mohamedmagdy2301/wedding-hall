@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
 import { auditLogs, bookingCounters, bookingItems, bookings, customers, spaces } from "@/db/schema";
 import { summarize } from "@/domain/pricing";
@@ -749,6 +749,47 @@ describe("bookings (phase 5)", () => {
     expect(results.filter((r) => !r.ok).map((r) => (r as { error: Failure }).error.code)).toEqual([
       "CONCURRENT_MODIFICATION",
     ]);
+  });
+
+  it("D-113: a forced deadlock between two bookings in two different spaces is retried — both succeed, nothing doubled or lost", async () => {
+    const s = await scenario();
+    // After each booking row is written (its transaction holds the numbering counter), wait
+    // a little, then lock the other spaces — which the other booking holds a share lock on
+    // while it waits for the counter. That is a lock cycle: a real deadlock (40P01).
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION test_cross_lock() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        PERFORM pg_sleep(0.3);
+        PERFORM 1 FROM spaces WHERE venue_id = NEW.venue_id AND id <> NEW.space_id FOR UPDATE;
+        RETURN NEW;
+      END; $$`);
+    await db.execute(
+      sql`CREATE TRIGGER test_cross_lock AFTER INSERT ON bookings FOR EACH ROW EXECUTE FUNCTION test_cross_lock()`,
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const results = await Promise.all([
+        s.call(bookingSpecs.createTentative, s.minimal({ customer: { name: "عميل أ", phone: "01011111111" } })),
+        s.call(
+          bookingSpecs.createTentative,
+          s.minimal({ spaceId: s.spaceB, customer: { name: "عميل ب", phone: "01022222222" } }),
+        ),
+      ]);
+      expect(results.map((r) => r.ok)).toEqual([true, true]);
+      expect(results.map((r) => ok(r).bookingNo).sort()).toEqual(["2026-0001", "2026-0002"]);
+      expect(warn.mock.calls.map((c) => String(c[0]))).toContain("transaction retried after 40P01 (attempt 2 of 3)");
+    } finally {
+      warn.mockRestore();
+      await db.execute(sql`DROP TRIGGER test_cross_lock ON bookings`);
+      await db.execute(sql`DROP FUNCTION test_cross_lock()`);
+    }
+    // The aborted attempt left nothing behind: two bookings, two customers, two audit rows each, no gap.
+    expect(await db.select().from(bookings)).toHaveLength(2);
+    expect(await db.select().from(customers)).toHaveLength(2);
+    const actions = (await db.select({ action: auditLogs.action }).from(auditLogs)).map((a) => a.action);
+    expect(actions.filter((a) => a === "bookings.create_tentative")).toHaveLength(2);
+    expect(actions.filter((a) => a === "customers.create")).toHaveLength(2);
+    expect((await db.select().from(bookingCounters)).map((c) => c.lastNo)).toEqual([2]);
   });
 
   it("C-08: a booking saved while the space is being deactivated waits for it and is refused (BR-06)", async () => {

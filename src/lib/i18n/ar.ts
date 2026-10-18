@@ -651,6 +651,7 @@ export const ar = {
       CONFLICT_SLOT_TAKEN: "الموعد محجوز.",
       CONCURRENT_MODIFICATION: "عدّل موظف آخر هذه البيانات. حدّث الصفحة وأعد المحاولة.",
       BUSINESS_RULE_VIOLATION: "العملية تخالف قواعد العمل.",
+      RETRY_LATER: "النظام مشغول دلوقتي. حاول تاني بعد لحظة.",
       INTERNAL_ERROR: "حدث خطأ غير متوقع. حاول مرة أخرى.",
     },
     /** Message keys used by services and Zod schemas. */
@@ -752,6 +753,7 @@ export const ar = {
       discountExceedsSubtotal: "الخصم أكبر من الإجمالي قبل الخصم (BR-52).",
       // Bookings (phase 5).
       slotTaken: "الموعد ده اتحجز مؤكد لحجز تاني (BR-11). حدّث الصفحة واختار موعد تاني.",
+      systemBusy: "النظام مشغول دلوقتي. حاول تاني بعد لحظة.",
       bookingNotTentative: "الحجز ده مش مبدئي، فالعملية دي مش متاحة عليه.",
       bookingNotFound: "الحجز غير موجود.",
       bookingChanged: "الحجز اتعدّل من شخص تاني. حدّث الصفحة وراجع التعديلات.",
