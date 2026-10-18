@@ -10,8 +10,9 @@ export default defineConfig({
     include: ["tests/integration/**/*.test.ts"],
     environment: "node",
     globalSetup: ["tests/integration/global-setup.ts"],
-    // One shared database: run files sequentially to keep tests isolated.
-    fileParallelism: false,
+    // Files run in parallel locally, each worker on its own copy of the test database
+    // (global-setup). The Neon config runs them in sequence on one database.
+    maxWorkers: 8,
     testTimeout: 30_000,
     hookTimeout: 60_000,
   },

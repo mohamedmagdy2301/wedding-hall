@@ -6,6 +6,8 @@ process.env.TEST_TARGET = "neon";
 
 export default mergeConfig(integrationConfig, {
   test: {
+    // One throwaway database on Neon: files run in sequence.
+    fileParallelism: false,
     testTimeout: 60_000,
     hookTimeout: 120_000,
   },

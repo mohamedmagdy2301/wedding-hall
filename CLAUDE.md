@@ -63,8 +63,8 @@ Next.js (App Router) + TypeScript strict · Tailwind (RTL) · Zod · Drizzle ORM
 | `npm run dev` | خادم التطوير |
 | `npm run build` | بناء Next.js |
 | `npm run lint` / `npm run typecheck` / `npm run format:check` | فحص الكود |
-| `npm test` | اختبارات الوحدات (Vitest) |
-| `npm run test:integration` | اختبارات التكامل على PostgreSQL 18 حقيقي في Docker، عبر driver الإنتاج |
+| `npm test` | اختبارات الوحدات (Vitest)؛ أثناء الشغل: `npx vitest related <files> --run` |
+| `npm run test:integration` | اختبارات التكامل على PostgreSQL 18 حقيقي في Docker، عبر driver الإنتاج، بالتوازي (8 workers، كل worker على نسخة من قاعدة template)؛ ملف واحد: `npm run test:integration -- <file>` |
 | `npm run test:integration:neon` | نفس اختبارات التكامل في قاعدة مؤقتة على مشروع Neon (تُحذف بعدها) |
 | `npm run test:e2e` | Playwright (كمبيوتر + موبايل، ملف ورا ملف لأن المنشأة واحدة)؛ `E2E_BASE_URL=<url>` لاختبار نسخة قائمة |
 | `npm run db:generate` | توليد Migration من المخطط (drizzle-kit) |

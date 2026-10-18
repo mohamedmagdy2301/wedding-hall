@@ -4,7 +4,7 @@ import { afterAll, beforeEach, describe, expect, inject, it } from "vitest";
 import { auditLogs, users } from "@/db/schema";
 import { resolveSession } from "@/modules/auth/sessions";
 import { grantOwnership } from "@/modules/users-rbac/users";
-import { connectTestDb, truncateAll } from "./helpers/db";
+import { connectTestDb, testDatabaseUrl, truncateAll } from "./helpers/db";
 import { addStaff, depsAt, setUpVenueWithOwner, signIn } from "./helpers/fixtures";
 
 /** Runs a script as the product owner would, with answers piped to stdin (no TTY). */
@@ -15,7 +15,7 @@ function runScript(script: string, args: string[], input: string[]) {
     encoding: "utf8",
     env: {
       ...process.env,
-      DATABASE_URL: inject("testDatabaseUrl"),
+      DATABASE_URL: testDatabaseUrl(),
       NEON_LOCAL_WSPROXY: wsProxy ?? "",
       APP_ENV: "test",
       PASSWORD_HASH_MEMORY_KIB: "1024",
