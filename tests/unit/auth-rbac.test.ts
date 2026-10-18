@@ -78,12 +78,13 @@ describe("permissions (ROLES_PERMISSIONS, BR-102)", () => {
     expect([...perms].sort()).toEqual(["bookings.view", "payments.record"]);
   });
 
-  it("default roles match the matrix: settings.manage and users.manage belong to the owner", () => {
+  it("default roles match the matrix: settings.manage, users.manage and payments.backdate belong to the owner (D-118)", () => {
     const byName = Object.fromEntries(DEFAULT_ROLES.map((r) => [r.name, new Set<PermissionKey>(r.permissions)]));
-    expect(byName["مدير"].size).toBe(PERMISSION_KEYS.length - 2);
+    expect(byName["مدير"].size).toBe(PERMISSION_KEYS.length - 3);
     for (const role of DEFAULT_ROLES) {
       expect(role.permissions).not.toContain("settings.manage");
       expect(role.permissions).not.toContain("users.manage");
+      expect(role.permissions).not.toContain("payments.backdate");
     }
     expect(byName["استقبال/حجوزات"].has("bookings.cancel")).toBe(false);
     expect(byName["محاسب"].has("payments.refund")).toBe(true);
