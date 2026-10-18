@@ -5,3 +5,4 @@ export * from "./settings";
 export * from "./spaces";
 export * from "./catalog";
 export * from "./bookings";
+export * from "./payments";
