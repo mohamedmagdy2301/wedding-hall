@@ -28,7 +28,7 @@
 | postpone_credit_mode | enum(`refund`,`services`,`both`) | |
 
 ### booking_counters
-`venue_id, year int, last_no int`، والمفتاح `(venue_id, year)` (D-105). رقم الحجز الجديد = `INSERT … ON CONFLICT DO UPDATE SET last_no = last_no + 1 RETURNING` داخل Transaction الإنشاء، فلا يتكرر تحت التوازي ولا يضيع عند الفشل (BR-26). عداد الإيصالات (المرحلة 6) يُحدد في خطتها.
+`venue_id, year int, last_no int`، والمفتاح `(venue_id, year)` (D-105). رقم الحجز الجديد = `INSERT … ON CONFLICT DO UPDATE SET last_no = last_no + 1 RETURNING` داخل Transaction الإنشاء، فلا يتكرر تحت التوازي ولا يضيع عند الفشل (BR-26). وبنفس الطريقة `receipt_counters (venue_id PK, last_no)` لرقم الإيصال المتصل بلا تصفير (D-125).
 
 ### cancellation_tiers
 `id, venue_id, min_days_before int ≥ 0, refund_bps int (0–10000)`
@@ -182,7 +182,9 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 | paid_at | timestamptz |
 | received_by | uuid |
 | note | text null |
-| voided_at, voided_by, void_reason | للإلغاء |
+| voided_at, voided_by, void_reason | للإلغاء؛ كلها أو لا شيء |
+
+trigger يمنع حذف الدفعات وأي تعديل غير إلغاء دفعة غير ملغاة (D-125). `paid_at` بتاريخ قديم لصاحب `payments.backdate` فقط (D-118).
 
 ## 6. المصروفات
 

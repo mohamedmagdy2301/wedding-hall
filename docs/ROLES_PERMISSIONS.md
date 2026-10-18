@@ -22,6 +22,7 @@
 | `payments.record` | تسجيل تحصيل | |
 | `payments.void` | إلغاء دفعة | ✔ |
 | `payments.refund` | تسجيل استرداد | ✔ |
+| `payments.backdate` | تسجيل دفعة بتاريخ قديم (D-118) | ✔ |
 | `documents.upload` | رفع مستندات | |
 | `documents.view_id` | رؤية صور البطاقات | ✔ |
 | `customers.manage` | إدارة العملاء | |
@@ -50,6 +51,7 @@
 | payments.record | ✔ | ✔ | ✔ |
 | payments.void | ✔ | | |
 | payments.refund | ✔ | | ✔ |
+| payments.backdate | | | |
 | documents.upload | ✔ | ✔ | |
 | documents.view_id | ✔ | | |
 | customers.manage | ✔ | ✔ | |
@@ -63,4 +65,4 @@
 | users.manage | | | |
 | audit.view | ✔ | | |
 
-> `settings.manage` و `users.manage` للمالك افتراضيًا، ويمكنه منحهما لأي دور.
+> `settings.manage` و `users.manage` و `payments.backdate` للمالك افتراضيًا، ويمكنه منحها لأي دور.

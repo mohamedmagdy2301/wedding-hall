@@ -3,7 +3,7 @@
 > في الـ MVP تُستدعى هذه العمليات عبر Server Actions. كل عملية: جلسة صالحة + مدخلات صالحة (Zod) + الصلاحية المذكورة. الأخطاء ترجع بكود ثابت ورسالة عربية.
 
 ## أكواد الأخطاء العامة
-`UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT_SLOT_TAKEN`, `CONCURRENT_MODIFICATION`, `BUSINESS_RULE_VIOLATION` (مع رقم القاعدة BR-xx)، `RETRY_LATER` (القاعدة ألغت العملية لأسباب توقيت بعد 3 محاولات: "النظام مشغول، حاول تاني" — D-113)، `INTERNAL_ERROR` (خطأ غير متوقع: رسالة عامة للمستخدم، ونص الخطأ فقط في سجل الخادم بلا بيانات حساسة — SEC-32).
+`UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT_SLOT_TAKEN`, `CONCURRENT_MODIFICATION`, `BUSINESS_RULE_VIOLATION` (مع رقم القاعدة BR-xx)، `PRICE_CHANGED` (السعر تغيّر منذ آخر عرض عند التأكيد — D-124)، `RETRY_LATER` (القاعدة ألغت العملية لأسباب توقيت بعد 3 محاولات: "النظام مشغول، حاول تاني" — D-113)، `INTERNAL_ERROR` (خطأ غير متوقع: رسالة عامة للمستخدم، ونص الخطأ فقط في سجل الخادم بلا بيانات حساسة — SEC-32).
 
 ## Auth
 | العملية | المدخلات | ملاحظات |
@@ -48,8 +48,8 @@ CRUD لـ `spaces` (مع `slots`، و `spaces.upcomingBookings(spaceId)` لتح�
 | `bookings.createTentative(spaceId, eventDate, slotKind, startTime?, endTime?, customer: {customerId} \| {name, phone, altPhone?}, eventTypeId?, groomName?, brideName?, packageId?, guests?, items[], removedServiceIds[], notes?)` | create | الحد الأدنى D-09؛ يرجع الرقم وتاريخ الانتهاء والتحذيرات (BR-12، D-102) |
 | `bookings.updateTentative(id, version, …نفس الحقول)` | edit | للمبدئي فقط؛ يعيد التسعير إن تغيّرت مدخلات السعر، ولا يجدد الصلاحية (D-101) |
 | `bookings.extendTentative(id, version)` | edit | `tentative_expires_at = الآن + tentative_hold_hours` (D-101) |
-| `bookings.createConfirmed` | create + payments.record | مع عربون وأقساط |
-| `bookings.confirm(id, version, deposit, installments[])` | confirm + payments.record | BR-21/22؛ المرحلة 6، والانتقال للحالة المؤكدة عبر `markConfirmed` فقط (D-97) |
+| `bookings.createConfirmed(…حقول createTentative, expectedTotal, deposit{amount, methodId, paidAt?}, installments[])` | create + confirm + payments.record (D-123) | BR-23؛ يرجع رقم الحجز ورقم الإيصال |
+| `bookings.confirm(id, version, expectedTotal, deposit{amount, methodId, paidAt?}, installments[])` | confirm + payments.record (+ `payments.backdate` مع `paidAt`) | BR-21/22؛ إعادة التسعير، و `PRICE_CHANGED` إن اختلف الإجمالي (D-124)؛ والانتقال للحالة المؤكدة عبر `markConfirmed` فقط (D-97) |
 | `bookings.updateDetails(id, version, eventTypeId, groomName, brideName, notes, customerId)` | edit | بيانات غير مالية لأي حجز غير ملغي |
 | `bookings.updateItems(id, version, changes, installments?, creditResolution?)` | edit | BR-40..43؛ يشمل تغيير عدد المعازيم (D-35)، وإعادة ضبط الأقساط إن تغيّر الإجمالي (D-34) |
 | `bookings.postpone(id, version, newDate, slotKind, times, creditResolution?)` | postpone | BR-80..85 |
@@ -63,11 +63,13 @@ CRUD لـ `spaces` (مع `slots`، و `spaces.upcomingBookings(spaceId)` لتح�
 `discounts.listPending` — approve
 
 ## Payments
-`payments.record(bookingId, kind, amount, methodId, paidAt, note?)` — record
+`payments.record(bookingId, amount, methodId, paidAt?, note?)` — record (+ `payments.backdate` مع `paidAt` — D-118)؛ النوع يحدده السيرفر (D-126)، ويرجع رقم الإيصال
+`payments.recordDeposit(bookingId, amount, methodId, paidAt?, note?, installments?)` — record؛ عربون بديل بعد إلغاء العربون (D-40)، والجدول يُضبط إن لم يُرسل (D-121)
 `payments.void(paymentId, reason)` — void
-`payments.refund(bookingId, amount, methodId, reason)` — refund
-`installments.set(bookingId, installments[])` — record
-`collections.list(from, to, overdueOnly?)` — record
+`payments.receipt(paymentId)` — `bookings.view`؛ بيانات الطباعة وقت الإصدار (D-122)
+`payments.refund(bookingId, amount, methodId, reason)` — refund (المرحلتان 7/8 — D-126)
+`installments.set(bookingId, version, installments[{dueDate, amount}])` — record
+`collections.list(from, to)` — record (D-123)
 
 ## Documents
 `documents.upload(bookingId, kind, file)` — upload (حد للحجم والنوع)
