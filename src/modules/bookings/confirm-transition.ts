@@ -11,9 +11,10 @@ import { AppError, pgError, ruleViolation } from "@/modules/shared/errors";
  * the space (D-115) so clashing confirmations do not deadlock; callers still run it inside
  * `runTransaction`, which retries any deadlock left (D-113).
  *
- * Phase 5 calls it from tests only: no Server Action or screen may import this file — an
- * ESLint rule and a unit test guard that (D-97). Phase 6's `bookings.confirm` wraps it with
- * the deposit, the re-pricing (D-41, D-95) and the readiness and completeness checks.
+ * Its one caller is the confirmation service (confirm.ts: `bookings.confirm` and
+ * `bookings.createConfirmed`), which wraps it with the deposit, the re-pricing (D-41, D-95)
+ * and the readiness and completeness checks; an ESLint rule and a unit test keep every
+ * other file of src/ from importing it (D-97, D-127).
  */
 
 export type ConfirmTransitionInput = {

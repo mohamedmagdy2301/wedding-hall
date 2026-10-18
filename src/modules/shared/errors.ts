@@ -10,6 +10,8 @@ export const ERROR_CODES = [
   "CONFLICT_SLOT_TAKEN",
   "CONCURRENT_MODIFICATION",
   "BUSINESS_RULE_VIOLATION",
+  // The re-priced total differs from the one the staff member confirmed (D-124).
+  "PRICE_CHANGED",
   // Transient: the database kept aborting the transaction for timing reasons (D-113).
   "RETRY_LATER",
   // Not in API.md's list: an unexpected failure the user can only retry.
@@ -25,7 +27,7 @@ export class AppError extends Error {
     readonly code: ErrorCode,
     /** Key under `errors.messages` in the i18n catalog. */
     readonly messageKey: string,
-    readonly options: { rule?: string; fieldErrors?: FieldErrors } = {},
+    readonly options: { rule?: string; fieldErrors?: FieldErrors; details?: Record<string, unknown> } = {},
   ) {
     super(`${code}: ${messageKey}${options.rule ? ` (${options.rule})` : ""}`);
     this.name = "AppError";
@@ -37,6 +39,11 @@ export class AppError extends Error {
 
   get fieldErrors() {
     return this.options.fieldErrors;
+  }
+
+  /** Data the screen needs to act on the error, e.g. the new price (D-124). */
+  get details() {
+    return this.options.details;
   }
 }
 

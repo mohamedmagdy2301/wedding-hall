@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { DISPLAY_STATUSES } from "@/domain/booking-status";
 import { MAX_ITEM_QUANTITY, SLOT_KINDS } from "@/domain/catalog";
+import { MAX_PIASTERS } from "@/domain/money";
 import { MAX_GUESTS, MAX_QUOTE_ITEMS } from "@/domain/pricing";
 import { addDays } from "@/lib/time";
 import { mobileField, nullableText, optionalMobileField } from "@/modules/customers/schemas";
+import { depositSchema, scheduleSchema } from "@/modules/payments/schemas";
 import { dateField, id, intField, listName, optionalIntField, timeField } from "@/modules/shared/fields";
 
 // API.md "Bookings" and "Availability" (D-99, D-101, D-106).
@@ -77,6 +79,17 @@ export const updateTentativeSchema = bookingObject
   .superRefine((value, ctx) => packageRules(value, ctx));
 export type UpdateTentativeInput = z.output<typeof updateTentativeSchema>;
 
+/** What confirming adds (D-124, D-127): the total seen, in piasters as quoted; the deposit and schedule as typed. */
+const confirmFields = {
+  expectedTotal: intField(0, MAX_PIASTERS),
+  deposit: depositSchema,
+  installments: scheduleSchema.default([]),
+};
+
+export const confirmSchema = z.object({ bookingId: id, version, ...confirmFields });
+
+export const createConfirmedSchema = bookingObject.extend(confirmFields).superRefine(packageRules);
+
 export const extendTentativeSchema = z.object({ bookingId: id, version });
 
 export const updateDetailsSchema = z.object({
@@ -99,6 +112,7 @@ export const bookingListSchema = z.object({
   slotKind: z.union([z.literal(""), z.enum(SLOT_KINDS)]).default(""),
   from: z.union([z.literal(""), dateField]).default(""),
   to: z.union([z.literal(""), dateField]).default(""),
+  balance: z.union([z.literal(""), z.literal("due")]).default(""),
   page: intField(1, 100_000).default(1),
 });
 export type BookingListFilters = z.output<typeof bookingListSchema>;

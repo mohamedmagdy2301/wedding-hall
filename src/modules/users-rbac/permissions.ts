@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   { key: "payments.record", sensitive: false },
   { key: "payments.void", sensitive: true },
   { key: "payments.refund", sensitive: true },
+  { key: "payments.backdate", sensitive: true },
   { key: "documents.upload", sensitive: false },
   { key: "documents.view_id", sensitive: true },
   { key: "customers.manage", sensitive: false },
@@ -40,7 +41,10 @@ export function isPermissionKey(value: string): value is PermissionKey {
 export const DEFAULT_ROLES: ReadonlyArray<{ name: string; permissions: readonly PermissionKey[] }> = [
   {
     name: "مدير",
-    permissions: PERMISSION_KEYS.filter((k) => k !== "settings.manage" && k !== "users.manage"),
+    // payments.backdate is in no default role (D-118).
+    permissions: PERMISSION_KEYS.filter(
+      (k) => k !== "settings.manage" && k !== "users.manage" && k !== "payments.backdate",
+    ),
   },
   {
     name: "استقبال/حجوزات",

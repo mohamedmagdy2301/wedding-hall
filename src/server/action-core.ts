@@ -16,6 +16,7 @@ export type ActionError = {
   message: string;
   rule?: string;
   fieldErrors?: Record<string, string>;
+  details?: Record<string, unknown>;
 };
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: ActionError };
@@ -58,7 +59,7 @@ export function fromError(error: unknown): { ok: false; error: ActionError } {
     const fieldErrors = error.fieldErrors
       ? Object.fromEntries(Object.entries(error.fieldErrors).map(([k, v]) => [k, translate(v)]))
       : undefined;
-    return failure(error.code, error.messageKey, { rule: error.rule, fieldErrors });
+    return failure(error.code, error.messageKey, { rule: error.rule, fieldErrors, details: error.details });
   }
   console.error("action failed:", error instanceof Error ? error.message : "unknown error");
   return failure("INTERNAL_ERROR");

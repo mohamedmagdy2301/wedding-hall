@@ -6,7 +6,7 @@ import type { DbOrTx, Tx } from "@/modules/shared/db";
 
 /**
  * Booking queries shared by the services. The status change to `confirmed` lives apart, in
- * its own file that nothing in src/ may import during phase 5 (D-97).
+ * its own file that only the confirmation service imports (D-97, D-127).
  */
 
 export type OverlapCandidate = {

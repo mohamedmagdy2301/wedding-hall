@@ -85,6 +85,15 @@ export async function allSpaceSlots(
   return [...bySpace].flatMap(([spaceId, s]) => (s.day && s.evening ? [{ spaceId, slots: s as SpaceSlotTimes }] : []));
 }
 
+/**
+ * The deposit and cancellation policies a confirmation applies (BR-21, D-68, D-119), for a
+ * caller that already checked its own permission.
+ */
+export async function readVenuePolicies(db: DbOrTx, venueId: string) {
+  const { minDepositType, minDepositValue, cancellationBasis, tiers } = await readSettings(db, venueId);
+  return { minDepositType, minDepositValue, cancellationBasis, tiers };
+}
+
 /** The buffer and hold for screens of other permissions (spaces need the buffer, `catalog.manage`). */
 export async function getTiming(db: DbOrTx, venueId: string) {
   const [venue] = await db

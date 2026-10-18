@@ -19,7 +19,7 @@ import type { BookingInput, UpdateDetailsInput, UpdateTentativeInput } from "./s
 
 /**
  * Tentative bookings (BR-20, D-08, D-09) and their edits (D-101). Each operation is one
- * transaction with its audit row (CLAUDE.md rule 7). Confirming is phase 6 (D-97).
+ * transaction with its audit row (CLAUDE.md rule 7). Confirming is in confirm.ts (D-97, D-127).
  *
  * Saving a booking: the space (active, share-locked — BR-06, C-08), its times from the
  * slots and the current buffer (BR-03, BR-04, BR-10, D-100, D-110), the date window
@@ -34,7 +34,7 @@ export type OverlapWarning = { id: string; bookingNo: string; startsAt: Date; en
 export type BookingWarnings = { confirmedConflicts: OverlapWarning[]; tentativeOverlaps: OverlapWarning[] };
 
 /** The space share-locked for the transaction (C-08), with its slots and the venue's timing. */
-async function loadSpace(tx: Tx, venueId: string, spaceId: string) {
+export async function loadSpace(tx: Tx, venueId: string, spaceId: string) {
   await lockSpaceRow(tx, venueId, spaceId, "share");
   return readSpaceWithTiming(tx, venueId, spaceId);
 }
@@ -66,7 +66,7 @@ function assertDateWindow(eventDate: string, startsAt: Date, now: Date) {
   }
 }
 
-function assertActiveSpace(space: Space) {
+export function assertActiveSpace(space: Space) {
   if (!space.isActive) {
     throw new AppError("BUSINESS_RULE_VIOLATION", "spaceInactiveForBooking", {
       rule: "BR-06",
@@ -76,7 +76,7 @@ function assertActiveSpace(space: Space) {
 }
 
 /** BR-05: never more guests than the space's capacity, when it has one. */
-function assertCapacity(space: Space, guests: number | null) {
+export function assertCapacity(space: Space, guests: number | null) {
   if (guests !== null && space.capacityMax !== null && guests > space.capacityMax) {
     throw new AppError("BUSINESS_RULE_VIOLATION", "overCapacity", {
       rule: "BR-05",
@@ -116,7 +116,7 @@ async function priceFor(tx: Tx, venueId: string, input: BookingInput): Promise<P
 }
 
 /** The breakdown in the booking's columns, as is (PHASE4_PLAN §3). */
-function priceColumns(price: PriceBreakdown | null) {
+export function priceColumns(price: PriceBreakdown | null) {
   return {
     seasonId: price?.seasonId ?? null,
     basePrice: price?.basePrice ?? null,
@@ -130,7 +130,7 @@ function priceColumns(price: PriceBreakdown | null) {
   };
 }
 
-async function insertLines(tx: Tx, venueId: string, bookingId: string, price: PriceBreakdown | null) {
+export async function insertLines(tx: Tx, venueId: string, bookingId: string, price: PriceBreakdown | null) {
   if (!price || price.lines.length === 0) return;
   await tx.insert(bookingItems).values(
     price.lines.map((line, index) => ({
@@ -241,59 +241,65 @@ export async function readBookingSnapshot(db: DbOrTx, venueId: string, bookingId
 /** `bookings.createTentative` (BR-20, D-09, D-101). */
 export async function createTentative(deps: ServiceDeps, actor: SessionUser, input: BookingInput) {
   assertAllowed(actor, "bookings.create");
-  const venueId = actor.venueId;
   return runTransaction(deps.db, async (tx) => {
-    const { space, timing } = await loadSpace(tx, venueId, input.spaceId);
-    assertActiveSpace(space);
-    const times = resolveTimes(space, input, timing.bufferMinutes);
-    assertDateWindow(input.eventDate, times.startsAt, deps.now);
-    await assertEventType(tx, venueId, input.eventTypeId, null);
-    assertCapacity(space, input.guests);
-    const price = await priceFor(tx, venueId, input);
-    const customerId = await resolveCustomer(tx, actor, input.customer);
-    const bookingNo = await nextBookingNumber(tx, venueId, cairoYear(deps.now));
-    const tentativeExpiresAt = addMs(deps.now, timing.tentativeHoldHours * HOUR_MS);
-
-    const [row] = await tx
-      .insert(bookings)
-      .values({
-        venueId,
-        bookingNo,
-        spaceId: space.id,
-        customerId,
-        eventTypeId: input.eventTypeId,
-        groomName: input.groomName,
-        brideName: input.brideName,
-        slotKind: input.slotKind,
-        startsAt: times.startsAt,
-        endsAt: times.endsAt,
-        blockedUntil: times.blockedUntil,
-        guests: input.guests,
-        packageId: price ? input.packageId : null,
-        status: "tentative",
-        tentativeExpiresAt,
-        ...priceColumns(price),
-        notes: input.notes,
-        createdBy: actor.userId,
-      })
-      .returning({ id: bookings.id, version: bookings.version });
-    await insertLines(tx, venueId, row.id, price);
-
-    const warnings = await overlapWarnings(tx, venueId, space.id, times, deps.now, row.id);
+    const created = await insertTentative(tx, deps, actor, input);
     await recordAudit(tx, {
-      venueId,
+      venueId: actor.venueId,
       actorId: actor.userId,
       action: "bookings.create_tentative",
       entityType: "booking",
-      entityId: row.id,
-      after: await readBookingSnapshot(tx, venueId, row.id),
+      entityId: created.id,
+      after: await readBookingSnapshot(tx, actor.venueId, created.id),
     });
-    return { id: row.id, bookingNo, version: row.version, tentativeExpiresAt, warnings };
+    return created;
   });
 }
 
+/** The steps of saving a new tentative booking, inside the caller's transaction (and audit). */
+export async function insertTentative(tx: Tx, deps: ServiceDeps, actor: SessionUser, input: BookingInput) {
+  const venueId = actor.venueId;
+  const { space, timing } = await loadSpace(tx, venueId, input.spaceId);
+  assertActiveSpace(space);
+  const times = resolveTimes(space, input, timing.bufferMinutes);
+  assertDateWindow(input.eventDate, times.startsAt, deps.now);
+  await assertEventType(tx, venueId, input.eventTypeId, null);
+  assertCapacity(space, input.guests);
+  const price = await priceFor(tx, venueId, input);
+  const customerId = await resolveCustomer(tx, actor, input.customer);
+  const bookingNo = await nextBookingNumber(tx, venueId, cairoYear(deps.now));
+  const tentativeExpiresAt = addMs(deps.now, timing.tentativeHoldHours * HOUR_MS);
+
+  const [row] = await tx
+    .insert(bookings)
+    .values({
+      venueId,
+      bookingNo,
+      spaceId: space.id,
+      customerId,
+      eventTypeId: input.eventTypeId,
+      groomName: input.groomName,
+      brideName: input.brideName,
+      slotKind: input.slotKind,
+      startsAt: times.startsAt,
+      endsAt: times.endsAt,
+      blockedUntil: times.blockedUntil,
+      guests: input.guests,
+      packageId: price ? input.packageId : null,
+      status: "tentative",
+      tentativeExpiresAt,
+      ...priceColumns(price),
+      notes: input.notes,
+      createdBy: actor.userId,
+    })
+    .returning({ id: bookings.id, version: bookings.version });
+  await insertLines(tx, venueId, row.id, price);
+
+  const warnings = await overlapWarnings(tx, venueId, space.id, times, deps.now, row.id);
+  return { id: row.id, bookingNo, version: row.version, tentativeExpiresAt, warnings };
+}
+
 /** The booking row locked for the rest of the transaction, checked against the version the page opened. */
-async function lockBooking(tx: Tx, venueId: string, bookingId: string, version: number) {
+export async function lockBooking(tx: Tx, venueId: string, bookingId: string, version: number) {
   const [row] = await tx
     .select({
       id: bookings.id,

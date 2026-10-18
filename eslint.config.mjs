@@ -16,10 +16,21 @@ const eslintConfig = defineConfig([
           patterns: [
             {
               group: ["**/confirm-transition"],
-              message: "markConfirmed is not reachable from any Server Action or screen in phase 5; tests only (D-97).",
+              message:
+                "markConfirmed is reached through bookings.confirm only (src/modules/bookings/confirm.ts — D-97, D-127).",
             },
           ],
         },
+      ],
+    },
+  },
+  {
+    // The confirmation service is the one caller of markConfirmed (D-127).
+    files: ["src/modules/bookings/confirm.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { paths: [{ name: "fast-check", message: "fast-check is a dev dependency for tests only (D-96)." }] },
       ],
     },
   },

@@ -19,6 +19,7 @@ import { cairoDate, cairoTimeOfDay } from "@/lib/time";
 import { normalizeEgyptianMobile } from "@/modules/auth/login-id";
 import type { SessionUser } from "@/modules/auth/sessions";
 import { readServices } from "@/modules/catalog/services";
+import { bookingPayments, netPaidSql } from "@/modules/payments/queries";
 import { getTiming } from "@/modules/settings/venue";
 import type { DbOrTx } from "@/modules/shared/db";
 import { forbidden, notFound } from "@/modules/shared/errors";
@@ -66,6 +67,8 @@ export async function listBookings(db: DbOrTx, actor: SessionUser, filters: Book
     filters.slotKind ? eq(bookings.slotKind, filters.slotKind) : undefined,
     filters.from ? sql`${bookings.startsAt} >= ${cairoDayStart(filters.from)}` : undefined,
     filters.to ? sql`${bookings.startsAt} < ${cairoDayEnd(filters.to)}` : undefined,
+    // "عليه متبقي" (S-05): confirmed, completed included (BR-24), with money still due (BR-62).
+    filters.balance === "due" ? sql`${bookings.status} = 'confirmed' AND ${bookings.total} > ${netPaidSql}` : undefined,
   );
   const page = Math.max(1, filters.page);
   const [rows, [{ total }]] = await Promise.all([
@@ -83,6 +86,7 @@ export async function listBookings(db: DbOrTx, actor: SessionUser, filters: Book
         status: bookings.status,
         tentativeExpiresAt: bookings.tentativeExpiresAt,
         overlapsConfirmed: overlapsConfirmedSql,
+        paid: netPaidSql,
       })
       .from(bookings)
       .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
@@ -98,10 +102,12 @@ export async function listBookings(db: DbOrTx, actor: SessionUser, filters: Book
       .where(where),
   ]);
   return {
-    rows: rows.map(({ overlapsConfirmed, ...b }) => ({
+    rows: rows.map(({ overlapsConfirmed, paid, ...b }) => ({
       ...b,
       eventDate: cairoDate(b.startsAt),
       displayStatus: displayStatus(b, now, overlapsConfirmed),
+      // Owed only on a confirmed booking: a cancelled one shows no debt (BR-76, D-53).
+      remaining: b.status === "confirmed" && b.total !== null ? b.total - paid : null,
     })),
     total,
     page,
@@ -161,7 +167,7 @@ export async function getBooking(db: DbOrTx, actor: SessionUser, bookingId: stri
     .where(and(eq(bookings.id, bookingId), eq(bookings.venueId, actor.venueId)));
   if (!row) throw notFound("bookingNotFound");
 
-  const [lines, overlaps, history] = await Promise.all([
+  const [lines, overlaps, history, money] = await Promise.all([
     db
       .select({
         id: bookingItems.id,
@@ -204,9 +210,17 @@ export async function getBooking(db: DbOrTx, actor: SessionUser, bookingId: stri
       .from(auditLogs)
       .leftJoin(users, eq(users.id, auditLogs.actorId))
       .where(
-        and(eq(auditLogs.venueId, actor.venueId), eq(auditLogs.entityType, "booking"), eq(auditLogs.entityId, row.id)),
+        and(
+          eq(auditLogs.venueId, actor.venueId),
+          or(
+            and(eq(auditLogs.entityType, "booking"), eq(auditLogs.entityId, row.id)),
+            // Its payments (D-108): their audit rows carry the booking in `meta`.
+            and(eq(auditLogs.entityType, "payment"), sql`${auditLogs.meta}->>'bookingId' = ${row.id}`),
+          ),
+        ),
       )
       .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id)),
+    bookingPayments(db, actor.venueId, row, now),
   ]);
 
   const status = displayStatus(row, now, row.status === "tentative" && overlaps.confirmed.length > 0);
@@ -219,6 +233,7 @@ export async function getBooking(db: DbOrTx, actor: SessionUser, bookingId: stri
       displayStatus: status,
     },
     lines,
+    money,
     confirmedConflicts:
       row.status === "tentative" ? overlaps.confirmed.map(({ id, bookingNo }) => ({ id, bookingNo })) : [],
     history: history.map((h) => ({

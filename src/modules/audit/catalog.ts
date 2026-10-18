@@ -60,6 +60,11 @@ export const AUDIT_ACTIONS = [
   "bookings.update_tentative",
   "bookings.extend_tentative",
   "bookings.update_details",
+  "bookings.confirm",
+  "bookings.create_confirmed",
+  "payments.record",
+  "payments.void",
+  "installments.set",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -78,5 +83,6 @@ export const AUDIT_ENTITY_TYPES = [
   "package",
   "customer",
   "booking",
+  "payment",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

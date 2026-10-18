@@ -5,11 +5,14 @@ import {
   bookingIdSchema,
   bookingListSchema,
   calendarSchema,
+  confirmSchema,
+  createConfirmedSchema,
   createTentativeSchema,
   extendTentativeSchema,
   updateDetailsSchema,
   updateTentativeSchema,
 } from "@/modules/bookings/schemas";
+import { confirmBooking, createConfirmed } from "@/modules/bookings/confirm";
 import { createTentative, extendTentative, updateDetails, updateTentative } from "@/modules/bookings/service";
 import {
   createCustomerSchema,
@@ -22,8 +25,8 @@ import { createCustomer, getCustomer, listCustomers, lookupByPhone, updateCustom
 import { defineProtected } from "./define";
 
 /**
- * API.md "Bookings", "Availability" and "Customers" (phase 5). Confirming is phase 6 and
- * has no operation here (D-97).
+ * API.md "Bookings", "Availability" and "Customers" (phases 5 and 6). Confirming needs
+ * payments.record too, checked by the service (D-123).
  */
 export const bookingSpecs = {
   createTentative: defineProtected({
@@ -40,6 +43,16 @@ export const bookingSpecs = {
     schema: extendTentativeSchema,
     requires: "bookings.edit",
     handler: (ctx, input) => extendTentative(ctx, ctx.actor, input),
+  }),
+  confirm: defineProtected({
+    schema: confirmSchema,
+    requires: "bookings.confirm",
+    handler: (ctx, input) => confirmBooking(ctx, ctx.actor, input),
+  }),
+  createConfirmed: defineProtected({
+    schema: createConfirmedSchema,
+    requires: "bookings.create",
+    handler: (ctx, input) => createConfirmed(ctx, ctx.actor, input),
   }),
   updateDetails: defineProtected({
     schema: updateDetailsSchema,

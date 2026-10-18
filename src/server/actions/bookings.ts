@@ -7,7 +7,7 @@ import { availabilitySpecs, bookingSpecs, customerSpecs } from "../specs/booking
 
 /**
  * Bookings, availability and customers (phase 5). Each action runs session → Zod →
- * permission → service on the server (CLAUDE.md rule 6). No confirm action: phase 6 (D-97).
+ * permission → service on the server (CLAUDE.md rule 6). Confirming goes through bookings.confirm (D-97, D-127).
  */
 
 async function run<R>(result: Promise<ActionResult<R>>): Promise<ActionResult<R>> {
@@ -25,6 +25,12 @@ export async function updateTentativeAction(input: unknown) {
 }
 export async function extendTentativeAction(input: unknown) {
   return run(invoke(bookingSpecs.extendTentative, input));
+}
+export async function confirmBookingAction(input: unknown) {
+  return run(invoke(bookingSpecs.confirm, input));
+}
+export async function createConfirmedAction(input: unknown) {
+  return run(invoke(bookingSpecs.createConfirmed, input));
 }
 export async function updateBookingDetailsAction(input: unknown) {
   return run(invoke(bookingSpecs.updateDetails, input));
