@@ -4,7 +4,17 @@ import { connection } from "next/server";
 import { cache } from "react";
 import { getDb } from "@/db/request";
 import { listAudit, listAuditActors, type AuditFilters } from "@/modules/audit/service";
+import { calendar } from "@/modules/bookings/availability";
+import {
+  getBooking,
+  getBookingFormOptions,
+  getTentativeForEdit,
+  listBookings,
+  listSpaceNames,
+} from "@/modules/bookings/queries";
+import type { BookingListFilters, CalendarInput } from "@/modules/bookings/schemas";
 import { listServices } from "@/modules/catalog/services";
+import { getCustomer, listCustomers } from "@/modules/customers/service";
 import { getNewPackageOptions, getPackage, listPackages } from "@/modules/packages/service";
 import { resolveSession, type SessionUser } from "@/modules/auth/sessions";
 import { getSetupChecklist } from "@/modules/settings/checklist";
@@ -151,4 +161,66 @@ export async function getHomeSetupCard() {
   if (complete) return null;
   const counted = steps.filter((s) => s.required);
   return { done: counted.filter((s) => s.status === "done").length, total: counted.length };
+}
+
+/** S-06 new booking (`bookings.create`). The live price and availability need `bookings.view` too. */
+export async function getNewBookingPageData() {
+  const actor = await requireAccess("bookings.create");
+  return { options: await getBookingFormOptions(getDb(), actor), canView: satisfies(actor, "bookings.view") };
+}
+
+async function orNotFound<T>(id: string, read: () => Promise<T>): Promise<T> {
+  if (!uuidField.safeParse(id).success) notFound();
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof AppError && error.code === "NOT_FOUND") notFound();
+    throw error;
+  }
+}
+
+/** S-06 editing a tentative booking (`bookings.edit`, D-101); any other status goes back to its page. */
+export async function getEditBookingPageData(bookingId: string) {
+  const actor = await requireAccess("bookings.edit");
+  const db = getDb();
+  const booking = await orNotFound(bookingId, () => getTentativeForEdit(db, actor, bookingId));
+  if (booking.status !== "tentative") redirect(`/bookings/${bookingId}`);
+  return { booking, options: await getBookingFormOptions(db, actor), canView: satisfies(actor, "bookings.view") };
+}
+
+/** S-07 (`bookings.view`). */
+export async function getBookingPageData(bookingId: string) {
+  const actor = await requireAccess("bookings.view");
+  const db = getDb();
+  const data = await orNotFound(bookingId, () => getBooking(db, actor, bookingId, new Date()));
+  const timing = await getTiming(db, actor.venueId);
+  return { ...data, canEdit: satisfies(actor, "bookings.edit"), holdHours: timing.tentativeHoldHours };
+}
+
+/** S-05 (`bookings.view`). */
+export async function getBookingsPageData(filters: BookingListFilters) {
+  const actor = await requireAccess("bookings.view");
+  const db = getDb();
+  const [result, spaces] = await Promise.all([listBookings(db, actor, filters, new Date()), listSpaceNames(db, actor)]);
+  return { ...result, spaces, canCreate: satisfies(actor, "bookings.create") };
+}
+
+/** S-04 (`bookings.view`). */
+export async function getCalendarPageData(input: CalendarInput) {
+  const actor = await requireAccess("bookings.view");
+  const data = await calendar(getDb(), actor, input, new Date());
+  return { ...data, canCreate: satisfies(actor, "bookings.create") };
+}
+
+/** S-08 list (`bookings.view`; adding and editing need `customers.manage`). */
+export async function getCustomersPageData(input: { search: string; page: number }) {
+  const actor = await requireAccess("bookings.view");
+  return { ...(await listCustomers(getDb(), actor, input)), canManage: satisfies(actor, "customers.manage") };
+}
+
+/** S-08 customer page. */
+export async function getCustomerPageData(customerId: string) {
+  const actor = await requireAccess("bookings.view");
+  const data = await orNotFound(customerId, () => getCustomer(getDb(), actor, customerId, new Date()));
+  return { ...data, canManage: satisfies(actor, "customers.manage") };
 }

@@ -118,3 +118,10 @@ export function cairoInstant(date: string, time: string): Date {
   if (valid.length === 0) return new Date(wall - before);
   return new Date(Math.max(...valid));
 }
+
+const isoMonthFormat = new Intl.DateTimeFormat("ar-EG", { timeZone: "UTC", month: "long", year: "numeric" });
+
+/** The month of a calendar date for display: "2026-10-18" → "أكتوبر ٢٠٢٦". */
+export function formatIsoMonth(text: string): string {
+  return isoMonthFormat.format(new Date(`${text.slice(0, 7)}-01T00:00:00Z`));
+}

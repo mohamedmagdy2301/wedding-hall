@@ -37,3 +37,6 @@ npm-debug.log*
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# Playwright MCP screenshots and snapshots (local review only)
+.playwright-mcp/

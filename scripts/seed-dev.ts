@@ -1,7 +1,9 @@
+import { addDays, cairoDate } from "../src/lib/time";
 import type { SessionUser } from "../src/modules/auth/sessions";
+import { createTentative } from "../src/modules/bookings/service";
 import { createService, type ServiceInput } from "../src/modules/catalog/services";
 import { createPackage, type PackageFields } from "../src/modules/packages/service";
-import { addSuggestedItems } from "../src/modules/settings/lists";
+import { addSuggestedItems, listItems } from "../src/modules/settings/lists";
 import { createSeason } from "../src/modules/settings/seasons";
 import { setupVenue } from "../src/modules/settings/setup";
 import { updatePolicies, updateVenue } from "../src/modules/settings/venue";
@@ -17,6 +19,8 @@ import { fail, scriptDeps } from "./lib/services";
  * tiers, services of every kind, packages with regular and season prices and included items)
  * through the same services as the app; `--bare` stops after the venue, to walk through
  * the guided setup (S-14) from scratch.
+ * Phase 5 adds demo tentative bookings (one expired, two on the same slot, two customers
+ * with one number — D-28). Never confirmed ones: confirming is phase 6 (D-97).
  */
 async function seedDemoSettings(deps: ServiceDeps, owner: SessionUser) {
   await updateVenue(deps, owner, { name: "قاعة تجريبية", phone: "0221234567", address: "مدينة نصر، القاهرة" });
@@ -50,7 +54,95 @@ async function seedDemoSettings(deps: ServiceDeps, owner: SessionUser) {
       { minDaysBefore: 90, refundBps: 10000 },
     ],
   });
-  await seedDemoCatalog(deps, owner, { big: big.id, small: small.id, roof: roof.id }, summer.id);
+  const spaces = { big: big.id, small: small.id, roof: roof.id };
+  const packages = await seedDemoCatalog(deps, owner, spaces, summer.id);
+  await seedDemoBookings(deps, owner, spaces, packages);
+}
+
+/** Tentative bookings through the same service as the wizard, dated from today. */
+async function seedDemoBookings(
+  deps: ServiceDeps,
+  owner: SessionUser,
+  spaces: { big: string; small: string; roof: string },
+  packages: Record<string, string>,
+) {
+  const today = cairoDate(deps.now);
+  const eventTypes = await listItems(deps.db, owner, "eventTypes");
+  const typeId = (name: string) => eventTypes.find((e) => e.name === name)?.id ?? null;
+  const services = await deps.db.query.services.findMany({ columns: { id: true, name: true } });
+  const serviceId = (name: string) => services.find((x) => x.name === name)!.id;
+  const base = {
+    startTime: null,
+    endTime: null,
+    groomName: null,
+    brideName: null,
+    notes: null,
+    items: [],
+    removedServiceIds: [],
+  };
+  const book = (input: Partial<Parameters<typeof createTentative>[2]> & { spaceId: string; eventDate: string }, at = deps.now) =>
+    createTentative({ ...deps, now: at }, owner, {
+      ...base,
+      slotKind: "evening",
+      eventTypeId: null,
+      packageId: null,
+      guests: null,
+      customer: { name: "عميل تجريبي", phone: "01000000000", altPhone: null },
+      ...input,
+    });
+
+  const first = await book({
+    spaceId: spaces.big,
+    eventDate: addDays(today, 10),
+    eventTypeId: typeId("فرح"),
+    groomName: "محمد",
+    brideName: "منى",
+    packageId: packages["الباكيج الفضي"],
+    guests: 320,
+    customer: { name: "محمد أحمد", phone: "01001112233", altPhone: null },
+  });
+  // Another tentative booking on the same slot (D-08).
+  await book({
+    spaceId: spaces.big,
+    eventDate: addDays(today, 10),
+    customer: { name: "سارة محمود", phone: "01112223344", altPhone: null },
+  });
+  // A second customer with the first one's number (D-28).
+  await book({
+    spaceId: spaces.small,
+    eventDate: addDays(today, 14),
+    slotKind: "day",
+    eventTypeId: typeId("خطوبة"),
+    packageId: packages["باكيج الخطوبة"],
+    guests: 100,
+    customer: { name: "أحمد علي", phone: "01001112233", altPhone: null },
+  });
+  await book({
+    spaceId: spaces.roof,
+    eventDate: addDays(today, 20),
+    eventTypeId: typeId("عيد ميلاد"),
+    packageId: packages["الروف بالفرد"],
+    guests: 80,
+    removedServiceIds: [serviceId("دي جي")],
+    items: [
+      { serviceId: serviceId("دي جي"), quantity: 1, isExternal: true },
+      { serviceId: serviceId("تورتة"), quantity: 2, isExternal: false },
+    ],
+    customer: { name: "ياسمين حسن", phone: "01223334455", altPhone: null },
+  });
+  // Saved three days ago with the default 48-hour hold: shown as expired.
+  await book(
+    {
+      spaceId: spaces.big,
+      eventDate: addDays(today, 30),
+      slotKind: "full_day",
+      packageId: packages["الباكيج الذهبي"],
+      guests: 450,
+      customer: { name: "كريم سامي", phone: "01554445566", altPhone: null },
+    },
+    new Date(deps.now.getTime() - 72 * 3_600_000),
+  );
+  return first;
 }
 
 const pounds = (n: number) => n * 100;
@@ -199,7 +291,9 @@ async function seedDemoCatalog(
       items: [],
     },
   ];
-  for (const p of packages) await createPackage(deps, owner, p);
+  const created: Record<string, string> = {};
+  for (const p of packages) created[p.name] = (await createPackage(deps, owner, p)).id;
+  return created;
 }
 
 async function main() {

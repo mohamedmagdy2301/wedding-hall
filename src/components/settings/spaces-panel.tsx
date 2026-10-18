@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, MoreHorizontal, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/forms/confirm-dialog";
 import { Field, FormError } from "@/components/forms/field";
 import { useServerAction } from "@/components/forms/use-server-action";
@@ -16,9 +16,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { crossesMidnight, fullDay, isTimeOfDay, slotViolations, type SpaceSlotTimes } from "@/domain/slots";
-import { t } from "@/lib/i18n";
+import { fill, t } from "@/lib/i18n";
 import type { Space } from "@/modules/spaces/service";
-import { createSpaceAction, moveSpaceAction, setSpaceActiveAction, updateSpaceAction } from "@/server/actions/settings";
+import {
+  createSpaceAction,
+  moveSpaceAction,
+  setSpaceActiveAction,
+  spaceUpcomingBookingsAction,
+  updateSpaceAction,
+} from "@/server/actions/settings";
 
 const ts = t.settings.spaces;
 const messages: Record<string, string> = t.errors.messages;
@@ -149,6 +155,29 @@ function SpaceDialog({
   );
 }
 
+/** D-75 / D-112: how many upcoming bookings stay on the space; they are never cancelled. */
+function UpcomingWarning({ spaceId }: { spaceId: string }) {
+  const [counts, setCounts] = useState<{ confirmed: number; tentative: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    spaceUpcomingBookingsAction({ spaceId }).then((result) => {
+      if (!cancelled && result.ok) setCounts(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceId]);
+  const total = counts ? counts.confirmed + counts.tentative : 0;
+  return (
+    <span className="grid gap-2" data-testid="space-upcoming">
+      <span>{ts.deactivateDescription}</span>
+      <span className={total > 0 ? "font-medium text-foreground" : undefined}>
+        {!counts ? ts.upcomingLoading : total === 0 ? ts.upcomingNone : fill(ts.upcomingWarning, { total, ...counts })}
+      </span>
+    </span>
+  );
+}
+
 /** S-13 "الأماكن والفترات" (`catalog.manage`): each space with its day and evening slots (BR-01). */
 export function SpacesPanel({ spaces, bufferMinutes }: { spaces: Space[]; bufferMinutes: number }) {
   const [dialog, setDialog] = useState<{ kind: "create" } | { kind: "edit" | "toggle"; space: Space } | null>(null);
@@ -251,7 +280,7 @@ export function SpacesPanel({ spaces, bufferMinutes }: { spaces: Space[]; buffer
           open
           onOpenChange={close}
           title={`${dialog.space.isActive ? ts.deactivateTitle : t.settings.activate}: ${dialog.space.name}`}
-          description={dialog.space.isActive ? ts.deactivateDescription : ""}
+          description={dialog.space.isActive ? <UpcomingWarning spaceId={dialog.space.id} /> : ""}
           confirmLabel={dialog.space.isActive ? t.settings.deactivate : t.settings.activate}
           destructive={dialog.space.isActive}
           pending={setActive.pending}

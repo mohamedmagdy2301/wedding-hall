@@ -24,6 +24,9 @@ type NavItem = { href: string; label: string; permissions?: string[] };
 
 const NAV: NavItem[] = [
   { href: "/", label: t.shell.home },
+  { href: "/calendar", label: t.shell.calendar, permissions: ["bookings.view"] },
+  { href: "/bookings", label: t.shell.bookings, permissions: ["bookings.view"] },
+  { href: "/customers", label: t.shell.customers, permissions: ["bookings.view"] },
   { href: "/settings", label: t.shell.settings, permissions: ["settings.manage", "catalog.manage"] },
   { href: "/staff", label: t.shell.staff, permissions: ["users.manage"] },
   { href: "/audit", label: t.shell.audit, permissions: ["audit.view"] },

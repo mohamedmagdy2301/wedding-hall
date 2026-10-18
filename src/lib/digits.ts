@@ -8,3 +8,8 @@ export function toAsciiDigits(input: string): string {
     return String(i >= 0 ? i : EXTENDED_ARABIC_INDIC.indexOf(d));
   });
 }
+
+const countFormat = new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 });
+
+/** A count for display in Arabic digits: 450 → "٤٥٠" (display only). */
+export const formatCount = (n: number) => countFormat.format(n);
