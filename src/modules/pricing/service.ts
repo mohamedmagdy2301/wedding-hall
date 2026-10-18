@@ -1,9 +1,8 @@
-import { and, eq } from "drizzle-orm";
-import { seasons, spaces } from "@/db/schema";
+import { and, asc, eq } from "drizzle-orm";
+import { packageItems, packagePrices, packages, seasons, spaces } from "@/db/schema";
 import { quotePrice, type PriceBreakdown, type PricingCatalog, type PricingViolation } from "@/domain/pricing";
 import type { SessionUser } from "@/modules/auth/sessions";
 import { readServices } from "@/modules/catalog/services";
-import { readPackage } from "@/modules/packages/service";
 import type { DbOrTx } from "@/modules/shared/db";
 import { AppError, notFound } from "@/modules/shared/errors";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
@@ -43,32 +42,57 @@ function toAppError(violation: PricingViolation, serviceId?: string): AppError {
   return new AppError(code, violation, { rule, fieldErrors: key ? { [key]: violation } : undefined });
 }
 
-/** Everything the engine needs, read for the actor's venue only (T-05). */
+/**
+ * Everything the engine needs, read for the actor's venue only (T-05): the package with its
+ * space's status in one query, then its prices and items, the active seasons and the
+ * services (phase 5 §4.7: one connection, few round trips).
+ */
 async function readCatalog(db: DbOrTx, venueId: string, input: QuoteInput): Promise<PricingCatalog> {
-  const pkg = await readPackage(db, venueId, input.packageId);
-  if (pkg.spaceId !== input.spaceId) throw notFound("packageNotFound");
-  const [[space], seasonRows, serviceRows] = await Promise.all([
+  const [pkg] = await db
+    .select({
+      spaceId: packages.spaceId,
+      isActive: packages.isActive,
+      baseGuests: packages.baseGuests,
+      extraGuestPrice: packages.extraGuestPrice,
+      spaceActive: spaces.isActive,
+    })
+    .from(packages)
+    .innerJoin(spaces, eq(spaces.id, packages.spaceId))
+    .where(and(eq(packages.id, input.packageId), eq(packages.venueId, venueId)));
+  if (!pkg || pkg.spaceId !== input.spaceId) throw notFound("packageNotFound");
+  if (!pkg.isActive) throw new AppError("BUSINESS_RULE_VIOLATION", "packageInactive", { rule: "D-87" });
+  if (!pkg.spaceActive) throw new AppError("BUSINESS_RULE_VIOLATION", "spaceInactiveForBooking", { rule: "BR-06" });
+
+  const [prices, items, seasonRows, serviceRows] = await Promise.all([
     db
-      .select({ isActive: spaces.isActive })
-      .from(spaces)
-      .where(and(eq(spaces.id, pkg.spaceId), eq(spaces.venueId, venueId))),
+      .select({ slotKind: packagePrices.slotKind, seasonId: packagePrices.seasonId, price: packagePrices.price })
+      .from(packagePrices)
+      .where(eq(packagePrices.packageId, input.packageId)),
+    db
+      .select({
+        serviceId: packageItems.serviceId,
+        quantity: packageItems.quantity,
+        removable: packageItems.removable,
+        removalCredit: packageItems.removalCredit,
+      })
+      .from(packageItems)
+      .where(eq(packageItems.packageId, input.packageId))
+      .orderBy(asc(packageItems.createdAt)),
     db
       .select({ id: seasons.id, startDate: seasons.startDate, endDate: seasons.endDate })
       .from(seasons)
       .where(and(eq(seasons.venueId, venueId), eq(seasons.isActive, true))),
     readServices(db, venueId),
   ]);
-  if (!pkg.isActive) throw new AppError("BUSINESS_RULE_VIOLATION", "packageInactive", { rule: "D-87" });
-  if (!space?.isActive) throw new AppError("BUSINESS_RULE_VIOLATION", "spaceInactiveForBooking", { rule: "BR-06" });
 
   const services = new Map(serviceRows.map((s) => [s.id, s]));
   return {
     package: {
       baseGuests: pkg.baseGuests,
       extraGuestPrice: pkg.extraGuestPrice,
-      prices: pkg.prices,
+      prices,
       // Included services belong to the same venue (D-82: never deleted).
-      included: pkg.items.map((item) => ({
+      included: items.map((item) => ({
         service: services.get(item.serviceId)!,
         quantity: item.quantity,
         removable: item.removable,

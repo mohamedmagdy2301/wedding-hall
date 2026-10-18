@@ -4,10 +4,8 @@ import { displayStatus } from "@/domain/booking-status";
 import { intrudesOtherSlot } from "@/domain/booking-time";
 import { addDays, cairoDate } from "@/lib/time";
 import type { SessionUser } from "@/modules/auth/sessions";
-import { getTiming } from "@/modules/settings/venue";
 import type { DbOrTx } from "@/modules/shared/db";
-import { notFound } from "@/modules/shared/errors";
-import { readSpaces } from "@/modules/spaces/service";
+import { readSpaces, readSpaceWithTiming } from "@/modules/spaces/service";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
 import { findOverlapping, overlapsConfirmedSql } from "./repository";
 import type { AvailabilityInput, CalendarInput } from "./schemas";
@@ -22,10 +20,8 @@ import { resolveTimes } from "./service";
  */
 export async function checkAvailability(db: DbOrTx, actor: SessionUser, input: AvailabilityInput, now: Date) {
   assertAllowed(actor, "bookings.view");
-  const [space] = await readSpaces(db, actor.venueId, [input.spaceId]);
-  if (!space) throw notFound("spaceNotFound");
-  const { bufferMinutes } = await getTiming(db, actor.venueId);
-  const times = resolveTimes(space, input, bufferMinutes);
+  const { space, timing } = await readSpaceWithTiming(db, actor.venueId, input.spaceId);
+  const times = resolveTimes(space, input, timing.bufferMinutes);
   const found = await findOverlapping(
     db,
     { venueId: actor.venueId, spaceId: space.id, ...times, excludeBookingId: input.excludeBookingId },

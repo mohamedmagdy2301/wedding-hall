@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import { spaces, spaceSlots } from "@/db/schema";
+import { alias } from "drizzle-orm/pg-core";
+import { spaces, spaceSlots, venues } from "@/db/schema";
 import { slotViolations, toHhMm, type SpaceSlotTimes } from "@/domain/slots";
 import { recordAudit } from "@/modules/audit/service";
 import { countUpcomingBookings } from "@/modules/bookings/repository";
@@ -8,6 +9,7 @@ import { lockVenue } from "@/modules/settings/venue";
 import { mapNameConflict, moved } from "@/modules/settings/names";
 import type { ServiceDeps } from "@/modules/shared/context";
 import type { DbOrTx, Tx } from "@/modules/shared/db";
+import { runTransaction } from "@/modules/shared/transaction";
 import { AppError, notFound } from "@/modules/shared/errors";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
 
@@ -183,7 +185,8 @@ export async function setSpaceActive(
   input: { spaceId: string; active: boolean },
 ) {
   assertAllowed(actor, "catalog.manage");
-  await deps.db.transaction(async (tx) => {
+  // Shares locks with bookings being saved (C-08), so a deadlock is retried (D-113).
+  await runTransaction(deps.db, async (tx) => {
     // Waits for bookings being saved on this space, which hold a share lock (C-08, BR-06).
     await lockSpaceRow(tx, actor.venueId, input.spaceId, "update");
     const before = await readSpace(tx, actor.venueId, input.spaceId);
@@ -241,4 +244,43 @@ export async function upcomingBookings(db: DbOrTx, actor: SessionUser, input: { 
   const [space] = await readSpaces(db, actor.venueId, [input.spaceId]);
   if (!space) throw notFound("spaceNotFound");
   return countUpcomingBookings(db, actor.venueId, input.spaceId, now);
+}
+
+const daySlot = alias(spaceSlots, "day_slot");
+const eveningSlot = alias(spaceSlots, "evening_slot");
+
+/**
+ * One space with both slots and the venue's timing in a single query — what saving or
+ * checking a booking needs (BR-03, BR-10). One round trip instead of three (phase 5 §4.7).
+ */
+export async function readSpaceWithTiming(db: DbOrTx, venueId: string, spaceId: string) {
+  const [row] = await db
+    .select({
+      id: spaces.id,
+      name: spaces.name,
+      capacityMax: spaces.capacityMax,
+      isActive: spaces.isActive,
+      sortOrder: spaces.sortOrder,
+      dayStart: daySlot.startTime,
+      dayEnd: daySlot.endTime,
+      eveningStart: eveningSlot.startTime,
+      eveningEnd: eveningSlot.endTime,
+      bufferMinutes: venues.bufferMinutes,
+      tentativeHoldHours: venues.tentativeHoldHours,
+    })
+    .from(spaces)
+    .innerJoin(venues, eq(venues.id, spaces.venueId))
+    .innerJoin(daySlot, and(eq(daySlot.spaceId, spaces.id), eq(daySlot.kind, "day")))
+    .innerJoin(eveningSlot, and(eq(eveningSlot.spaceId, spaces.id), eq(eveningSlot.kind, "evening")))
+    .where(and(eq(spaces.id, spaceId), eq(spaces.venueId, venueId)));
+  if (!row) throw notFound("spaceNotFound");
+  const { dayStart, dayEnd, eveningStart, eveningEnd, bufferMinutes, tentativeHoldHours, ...space } = row;
+  return {
+    space: {
+      ...space,
+      day: { start: toHhMm(dayStart), end: toHhMm(dayEnd) },
+      evening: { start: toHhMm(eveningStart), end: toHhMm(eveningEnd) },
+    } satisfies Space,
+    timing: { bufferMinutes, tentativeHoldHours },
+  };
 }

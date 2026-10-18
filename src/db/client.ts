@@ -12,7 +12,16 @@ export type DbHandle = {
 type CreateDbOptions = {
   /** host:port of a local Neon wsproxy (docker compose); unset for real Neon. */
   localWsProxy?: string;
+  /** Most connections the pool opens; unset = the driver's default (tests need several). */
+  maxConnections?: number;
 };
+
+/**
+ * One connection per request: opening a connection costs far more than a query (about
+ * 150 ms locally against a few ms per query), and concurrent queries of one request would
+ * each open their own. With one, they queue on it instead (phase 5 report §4.7).
+ */
+export const REQUEST_MAX_CONNECTIONS = 1;
 
 /**
  * Creates a WebSocket-backed connection (supports interactive transactions).
@@ -27,7 +36,7 @@ export function createDb(connectionString: string, options: CreateDbOptions = {}
     neonConfig.pipelineTLS = false;
     neonConfig.pipelineConnect = false;
   }
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({ connectionString, max: options.maxConnections });
   // Idle-connection errors (e.g. the socket dropping at request end) are emitted as
   // events; without a listener they surface as uncaught errors in the Workers runtime.
   pool.on("error", (error: Error) => {
