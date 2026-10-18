@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { crossesMidnight, fullDay, isTimeOfDay, slotViolations, type SpaceSlotTimes } from "@/domain/slots";
+import { formatCount } from "@/lib/digits";
 import { fill, t } from "@/lib/i18n";
 import type { Space } from "@/modules/spaces/service";
 import {
@@ -172,7 +173,15 @@ function UpcomingWarning({ spaceId }: { spaceId: string }) {
     <span className="grid gap-2" data-testid="space-upcoming">
       <span>{ts.deactivateDescription}</span>
       <span className={total > 0 ? "font-medium text-foreground" : undefined}>
-        {!counts ? ts.upcomingLoading : total === 0 ? ts.upcomingNone : fill(ts.upcomingWarning, { total, ...counts })}
+        {!counts
+          ? ts.upcomingLoading
+          : total === 0
+            ? ts.upcomingNone
+            : fill(ts.upcomingWarning, {
+                total: formatCount(total),
+                confirmed: formatCount(counts.confirmed),
+                tentative: formatCount(counts.tentative),
+              })}
       </span>
     </span>
   );

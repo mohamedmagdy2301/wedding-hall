@@ -113,6 +113,8 @@ test("the owner adds a reception employee; dialog and menus render RTL (UF-11, P
   // The new employee and the setup are in the audit log.
   await page.getByRole("link", { name: "سجل العمليات" }).click();
   await expect(page.getByRole("cell", { name: "إضافة موظف" }).first()).toBeVisible();
+  // Filtered: by the time the mobile project runs, other journeys' rows fill the first page.
+  await page.goto("/audit?entity=venue");
   await expect(page.getByRole("cell", { name: "تجهيز المنشأة" })).toBeVisible();
 });
 
