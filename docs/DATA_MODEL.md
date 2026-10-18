@@ -151,6 +151,7 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 | removal_credit | قيمة خصم الإزالة المنسوخة |
 | is_external | |
 | external_fee | |
+| sort_order | ترتيب السطر كما رجّعه محرك التسعير (المضمن بترتيب الباكيج، ثم المضاف) للعرض والطباعة |
 | line_total | محسوب ومخزن للعرض؛ المرجع هو محرك التسعير. بإشارة: المضمن 0، المضمن المُزال − `removal_credit`، الخارجي `external_fee`، المضاف الداخلي `unit_price` (ثابت) أو `unit_price × quantity` (D-84) |
 
 `unit_price` = ما تحاسب عليه القاعة للوحدة، فهو 0 للمضمن وللخارجي (D-84، D-91). `quantity` للبند بالفرد = عدد المعازيم الذي يغطيه وقت تسعيره (D-84). `bookings.items_total` = Σ `line_total` للبنود غير المضمنة، شاملًا رسوم الخارجي (D-85).
