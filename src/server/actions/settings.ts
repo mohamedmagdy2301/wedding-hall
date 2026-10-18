@@ -54,6 +54,10 @@ export async function createSpaceAction(input: unknown) {
 export async function updateSpaceAction(input: unknown) {
   return run(invoke(spaceSpecs.updateSpace, input));
 }
+/** Read-only: the count shown before deactivating a space (D-75). */
+export async function spaceUpcomingBookingsAction(input: unknown) {
+  return invoke(spaceSpecs.upcomingBookings, input);
+}
 export async function setSpaceActiveAction(input: unknown) {
   return run(invoke(spaceSpecs.setSpaceActive, input));
 }

@@ -1,6 +1,7 @@
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import { bookingCounters, bookings } from "@/db/schema";
 import { bookingNumber } from "@/domain/booking-overlap";
+import type { DisplayStatus } from "@/domain/booking-status";
 import type { DbOrTx, Tx } from "@/modules/shared/db";
 
 /**
@@ -59,6 +60,52 @@ export async function findOverlapping(
     confirmed: rows.filter((r) => r.status === "confirmed"),
     tentative: rows.filter((r) => r.status === "tentative" && r.tentativeExpiresAt && r.tentativeExpiresAt > now),
   };
+}
+
+/**
+ * True when another confirmed booking of the same space overlaps this row's
+ * `[starts_at, blocked_until)` — the "conflicting" display status of a tentative booking
+ * (BR-13). For queries selecting from `bookings` without an alias.
+ */
+// Qualified by hand: drizzle renders a column of a single-table select without its table,
+// which inside this subquery would mean `c`.
+export const overlapsConfirmedSql = sql<boolean>`EXISTS (SELECT 1 FROM bookings c WHERE c.space_id = "bookings"."space_id"
+  AND c.status = 'confirmed' AND c.id <> "bookings"."id"
+  AND tstzrange(c.starts_at, c.blocked_until, '[)') && tstzrange("bookings"."starts_at", "bookings"."blocked_until", '[)'))`;
+
+/** The SQL condition of a display status at `now` (ADR-007), mirroring `displayStatus`. */
+export function displayStatusCondition(status: DisplayStatus, now: Date): SQL {
+  const at = sql`${now.toISOString()}::timestamptz`;
+  switch (status) {
+    case "cancelled":
+      return sql`${bookings.status} = 'cancelled'`;
+    case "confirmed":
+      return sql`${bookings.status} = 'confirmed' AND ${bookings.endsAt} > ${at}`;
+    case "completed":
+      return sql`${bookings.status} = 'confirmed' AND ${bookings.endsAt} <= ${at}`;
+    case "expired":
+      return sql`${bookings.status} = 'tentative' AND ${bookings.tentativeExpiresAt} <= ${at}`;
+    case "conflicting":
+      return sql`${bookings.status} = 'tentative' AND ${bookings.tentativeExpiresAt} > ${at} AND ${overlapsConfirmedSql}`;
+    case "tentative":
+      return sql`${bookings.status} = 'tentative' AND ${bookings.tentativeExpiresAt} > ${at} AND NOT ${overlapsConfirmedSql}`;
+  }
+}
+
+/**
+ * Upcoming bookings of a space for the deactivation warning (D-75, D-112): confirmed and
+ * live tentative bookings whose party has not ended.
+ */
+export async function countUpcomingBookings(db: DbOrTx, venueId: string, spaceId: string, now: Date) {
+  const at = sql`${now.toISOString()}::timestamptz`;
+  const [row] = await db
+    .select({
+      confirmed: sql<number>`count(*) FILTER (WHERE ${bookings.status} = 'confirmed')::int`,
+      tentative: sql<number>`count(*) FILTER (WHERE ${bookings.status} = 'tentative' AND ${bookings.tentativeExpiresAt} > ${at})::int`,
+    })
+    .from(bookings)
+    .where(and(eq(bookings.venueId, venueId), eq(bookings.spaceId, spaceId), sql`${bookings.endsAt} > ${at}`));
+  return { confirmed: row.confirmed, tentative: row.tentative };
 }
 
 /**

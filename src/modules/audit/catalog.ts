@@ -54,6 +54,12 @@ export const AUDIT_ACTIONS = [
   "packages.update",
   "packages.activate",
   "packages.deactivate",
+  "customers.create",
+  "customers.update",
+  "bookings.create_tentative",
+  "bookings.update_tentative",
+  "bookings.extend_tentative",
+  "bookings.update_details",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -70,5 +76,7 @@ export const AUDIT_ENTITY_TYPES = [
   "expense_category",
   "service",
   "package",
+  "customer",
+  "booking",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { spaces, spaceSlots } from "@/db/schema";
 import { slotViolations, toHhMm, type SpaceSlotTimes } from "@/domain/slots";
 import { recordAudit } from "@/modules/audit/service";
+import { countUpcomingBookings } from "@/modules/bookings/repository";
 import type { SessionUser } from "@/modules/auth/sessions";
 import { lockVenue } from "@/modules/settings/venue";
 import { mapNameConflict, moved } from "@/modules/settings/names";
@@ -23,7 +24,7 @@ export type Space = SpaceSlotTimes & {
   sortOrder: number;
 };
 
-async function readSpaces(db: DbOrTx, venueId: string, ids?: string[]): Promise<Space[]> {
+export async function readSpaces(db: DbOrTx, venueId: string, ids?: string[]): Promise<Space[]> {
   const where = ids ? and(eq(spaces.venueId, venueId), inArray(spaces.id, ids)) : eq(spaces.venueId, venueId);
   const rows = await db
     .select({
@@ -62,6 +63,20 @@ async function readSpace(tx: Tx, venueId: string, spaceId: string) {
   const [space] = await readSpaces(tx, venueId, [spaceId]);
   if (!space) throw notFound("spaceNotFound");
   return space;
+}
+
+/**
+ * Locks the space row for the rest of the transaction: `share` while a booking is saved on
+ * it, `update` while it is (de)activated — so no new booking lands on a space once it is
+ * deactivated (BR-06, C-08).
+ */
+export async function lockSpaceRow(tx: Tx, venueId: string, spaceId: string, mode: "share" | "update") {
+  const [row] = await tx
+    .select({ id: spaces.id })
+    .from(spaces)
+    .where(and(eq(spaces.id, spaceId), eq(spaces.venueId, venueId)))
+    .for(mode);
+  if (!row) throw notFound("spaceNotFound");
 }
 
 const snapshot = (s: Space) => ({
@@ -169,6 +184,8 @@ export async function setSpaceActive(
 ) {
   assertAllowed(actor, "catalog.manage");
   await deps.db.transaction(async (tx) => {
+    // Waits for bookings being saved on this space, which hold a share lock (C-08, BR-06).
+    await lockSpaceRow(tx, actor.venueId, input.spaceId, "update");
     const before = await readSpace(tx, actor.venueId, input.spaceId);
     if (before.isActive === input.active) return;
     await tx
@@ -216,4 +233,12 @@ export async function moveSpace(
       after: { order: next.map((i) => i.name) },
     });
   });
+}
+
+/** D-75 / D-112: the upcoming bookings a deactivation leaves in place, for its warning. */
+export async function upcomingBookings(db: DbOrTx, actor: SessionUser, input: { spaceId: string }, now: Date) {
+  assertAllowed(actor, "catalog.manage");
+  const [space] = await readSpaces(db, actor.venueId, [input.spaceId]);
+  if (!space) throw notFound("spaceNotFound");
+  return countUpcomingBookings(db, actor.venueId, input.spaceId, now);
 }

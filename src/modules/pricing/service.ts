@@ -82,7 +82,15 @@ async function readCatalog(db: DbOrTx, venueId: string, input: QuoteInput): Prom
 
 export async function quote(db: DbOrTx, actor: SessionUser, input: QuoteInput): Promise<PriceBreakdown> {
   assertAllowed(actor, "bookings.view");
-  const catalog = await readCatalog(db, actor.venueId, input);
+  return quoteForVenue(db, actor.venueId, input);
+}
+
+/**
+ * The same quote for a caller that already checked its own permission — saving a booking
+ * (`bookings.create` / `bookings.edit`) prices it inside its transaction.
+ */
+export async function quoteForVenue(db: DbOrTx, venueId: string, input: QuoteInput): Promise<PriceBreakdown> {
+  const catalog = await readCatalog(db, venueId, input);
   const result = quotePrice(catalog, {
     slotKind: input.slotKind,
     eventDate: input.eventDate,

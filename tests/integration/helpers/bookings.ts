@@ -124,7 +124,12 @@ export async function insertRawBooking(handle: DbHandle, w: World, b: RawBooking
 }
 
 /** Confirms through the one transition of the code base (D-97), in its own transaction. */
-export function confirmBooking(handle: DbHandle, w: World, bookingId: string, bufferMinutes = 60) {
+export function confirmBooking(
+  handle: DbHandle,
+  w: Pick<World, "venueId" | "ownerId">,
+  bookingId: string,
+  bufferMinutes = 60,
+) {
   return handle.db.transaction((tx) =>
     markConfirmed(tx, {
       venueId: w.venueId,
