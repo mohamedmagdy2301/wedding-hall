@@ -93,17 +93,15 @@ export async function readSchedule(db: DbOrTx, bookingId: string): Promise<Sched
 export async function replaceSchedule(tx: Tx, venueId: string, bookingId: string, lines: readonly ScheduleLine[]) {
   await tx.delete(installments).where(eq(installments.bookingId, bookingId));
   if (lines.length === 0) return;
-  await tx
-    .insert(installments)
-    .values(
-      lines.map((line, index) => ({
-        venueId,
-        bookingId,
-        dueDate: line.dueDate,
-        amount: line.amount,
-        sortOrder: index,
-      })),
-    );
+  await tx.insert(installments).values(
+    lines.map((line, index) => ({
+      venueId,
+      bookingId,
+      dueDate: line.dueDate,
+      amount: line.amount,
+      sortOrder: index,
+    })),
+  );
 }
 
 export async function insertPayment(

@@ -15,8 +15,14 @@ import { addStaff, callSpec, OWNER, setUpVenueWithOwner, signIn } from "./fixtur
  * the date window (BR-27) and the numbering year never drift.
  */
 
-type AnySpec = ProtectedSpec<z.ZodType, unknown>;
-export type Failure = { code: string; rule?: string; fieldErrors?: Record<string, string> };
+export type AnySpec = ProtectedSpec<z.ZodType, unknown>;
+export type Failure = {
+  code: string;
+  message?: string;
+  rule?: string;
+  fieldErrors?: Record<string, string>;
+  details?: Record<string, unknown>;
+};
 export type Result = { ok: true; data: any } | { ok: false; error: Failure }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export const NOW = new Date("2026-10-18T10:00:00Z");

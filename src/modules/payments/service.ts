@@ -1,12 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { bookings as bookingsTable, payments } from "@/db/schema";
-import { depositViolation } from "@/domain/deposit";
 import { rebalanceSchedule, scheduleViolation, type ScheduleLine } from "@/domain/installments";
 import { activeDeposit, exceedsTotal, netPaid, type PaymentKind } from "@/domain/payments";
 import { addYears, cairoDate, cairoInstant, cairoTimeOfDay } from "@/lib/time";
 import { recordAudit } from "@/modules/audit/service";
 import type { SessionUser } from "@/modules/auth/sessions";
-import { readVenuePolicies } from "@/modules/settings/venue";
 import type { ServiceDeps } from "@/modules/shared/context";
 import type { Tx } from "@/modules/shared/db";
 import { AppError, forbidden, notFound } from "@/modules/shared/errors";
@@ -169,7 +167,7 @@ export async function recordPayment(deps: ServiceDeps, actor: SessionUser, input
 
 /**
  * `payments.recordDeposit` (BR-60, D-40, D-121): a new deposit once the previous one was
- * voided, at least the current minimum (D-119) and within the remaining amount (BR-63). A
+ * voided, within the remaining amount (BR-63) — the minimum is for confirming only. A
  * schedule on the booking must still add up: rebalanced when none is sent, checked as sent
  * otherwise.
  */
@@ -182,19 +180,13 @@ export async function recordDeposit(deps: ServiceDeps, actor: SessionUser, input
     assertTakesPayments(booking.status);
     const method = await activeMethodName(tx, venueId, input.methodId);
     const total = booking.total ?? 0;
-    const [rows, schedule, policies] = await Promise.all([
-      readLedgerRows(tx, booking.id),
-      readSchedule(tx, booking.id),
-      readVenuePolicies(tx, venueId),
-    ]);
+    const [rows, schedule] = await Promise.all([readLedgerRows(tx, booking.id), readSchedule(tx, booking.id)]);
     if (activeDeposit(rows)) throw new AppError("BUSINESS_RULE_VIOLATION", "depositExists", { rule: "BR-60" });
-    const key =
-      depositViolation(total, policies, input.amount) ??
-      (exceedsTotal(total, netPaid(rows), input.amount) ? "overpayment" : null);
-    if (key) {
-      throw new AppError("BUSINESS_RULE_VIOLATION", key, {
-        rule: key === "depositBelowMinimum" ? "BR-21" : "BR-63",
-        fieldErrors: { amount: key },
+    // The minimum is a condition of confirming (BR-21), not of a replacement (I-07).
+    if (exceedsTotal(total, netPaid(rows), input.amount)) {
+      throw new AppError("BUSINESS_RULE_VIOLATION", "overpayment", {
+        rule: "BR-63",
+        fieldErrors: { amount: "overpayment" },
       });
     }
 
