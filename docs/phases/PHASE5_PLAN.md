@@ -1,6 +1,6 @@
 # خطة المرحلة 5 — العملاء والحجوزات والتقويم
 
-> الحالة: **مسودة للمراجعة، في انتظار موافقة مالك المنتج.** لا تنفيذ قبل الموافقة.
+> الحالة: **معتمدة من مالك المنتج (2026-10-18)** بكل المقترحات P5-01..P5-14 وكل الترشيحات Q5-01..Q5-11، مع أربع إضافات منه (القسم الأخير "قرارات مالك المنتج"). القرارات التي تمس الوثائق مسجلة في `DECISIONS.md` (D-97..D-112).
 > أي تعارض بين هذا الملف والوثائق يُرفع لمالك المنتج قبل التنفيذ.
 
 **معايير القبول (من ROADMAP):**
@@ -142,7 +142,7 @@ blocked_until = ends_at + bufferMinutes (دقايق حقيقية — BR-10)
 **اللي بيتعمل في المرحلة 5:**
 1. الأعمدة كلها، ومنها لقطة سياسة الإلغاء (D-68) و `confirmed_at/by`.
 2. قيد القاعدة اللي يرفض تأكيد حجز ناقص (القسم 1)، وقيد التعارض.
-3. **`markConfirmed(tx, …)`** في `src/modules/bookings/repository.ts`: **المكان الوحيد في الكود اللي بيغيّر الحالة لـ `confirmed`**. بيعمل `UPDATE … SET status = 'confirmed', confirmed_at, confirmed_by, cancellation_basis, cancellation_tiers, version = version + 1 WHERE id = ? AND status = 'tentative'` (و `blocked_until` حسب إجابة Q5-04)، وبيحوّل `23P01` لـ `CONFLICT_SLOT_TAKEN`. **مش متاح من أي Server Action في المرحلة دي**؛ اختبارات التكامل بس بتستخدمه (اختبار التزامن وتجهيز حجوزات مؤكدة للاختبارات — P5-01).
+3. **`markConfirmed(tx, …)`** في ملف لوحده `src/modules/bookings/confirm-transition.ts`: **المكان الوحيد في الكود اللي بيغيّر الحالة لـ `confirmed`**. بيعمل `UPDATE … SET status = 'confirmed', confirmed_at, confirmed_by, cancellation_basis, cancellation_tiers, version = version + 1 WHERE id = ? AND status = 'tentative'` و `blocked_until = ends_at + الوقت الفاصل الحالي` (D-110)، وبيحوّل `23P01` لـ `CONFLICT_SLOT_TAKEN`. **مش متاح من أي Server Action ولا شاشة في المرحلة دي**؛ اختبارات التكامل و e2e بس بتستخدمه (اختبار التزامن وتجهيز حجوزات مؤكدة للاختبارات — P5-01). **وده متضمون بقاعدة ESLint تمنع استيراد الملف من أي مكان في `src/`، واختبار وحدة بيدوّر في كل ملفات `src/` ويفشل لو أي ملف غيره ذكر الملف أو الدالة** (D-97).
 4. آخر عرض سعر محفوظ مع المبدئي (القسم 4.1)، عشان التأكيد يعرض الفرق (D-41).
 5. السطور فيها `service_id` لكل بند، عشان إعادة التسعير تلاقي المضاف والمُزال (D-86، D-95).
 6. `bookingReadiness` موجودة من المرحلة 2 (BR-21 بند 5).
@@ -175,7 +175,7 @@ blocked_until = ends_at + bufferMinutes (دقايق حقيقية — BR-10)
   - `booking-overlap.ts`: `rangesOverlap` بنفس معنى `'[)'`، و `bookingNumber(year, n)` بصيغة `YYYY-NNNN` (BR-26).
 - **`src/lib/time.ts`:** `cairoInstant(date, time)` (من ساعة القاهرة للحظة، بقاعدة P5-05) و `cairoYear` و تنسيق الساعة.
 - **`src/modules/customers/`:** `schemas.ts` و `service.ts` (lookup، list، get، create، update).
-- **`src/modules/bookings/`:** `schemas.ts`، `repository.ts` (القراءة، الحفظ، المتداخل، الترقيم، `markConfirmed`)، `service.ts` (createTentative، updateTentative، updateDetails، get، list)، `availability.ts` (check، calendar).
+- **`src/modules/bookings/`:** `schemas.ts`، `repository.ts` (القراءة، الحفظ، المتداخل، الترقيم)، `confirm-transition.ts` (`markConfirmed` لوحدها — D-97)، `service.ts` (createTentative، updateTentative، extendTentative، updateDetails، get، list)، `availability.ts` (check، calendar).
 - **`src/modules/spaces/`:** عدد الحجوزات الجاية للتحذير (D-75)، والتعطيل بقفل `FOR UPDATE` على صف المكان (C-08).
 - **`src/server/specs/` و `src/server/actions/`** لـ `customers` و `bookings` و `availability`، بنفس النمط (جلسة ← Zod ← صلاحية ← خدمة، والخدمة بتفحص الصلاحية تاني)، ودوال بيانات الصفحات في `src/server/dal.ts`.
 - **سجل العمليات:** أفعال جديدة في `src/modules/audit/catalog.ts` بأسمائها العربية وفي فلاتر S-16 (`customers.create`، `customers.update`، `bookings.create_tentative`، `bookings.update_tentative`، `bookings.update_details`).
@@ -460,3 +460,24 @@ D-37: التعديل "بلا حد بالدقائق". يعني ينفع حجز "�
 **Q5-11 — المبدئي على مكان اتعطّل.**
 BR-06 بيمنع الحجز **الجديد** على مكان معطّل. المبدئي الموجود عليه: ينفع يتعدّل؟ وينفع يتأكد في المرحلة 6؟
 **ترشيحي:** تعديل البيانات (العميل، الأسماء، الملاحظات) مسموح، أما تغيير الموعد أو الباكيج فلازم لمكان نشط. والتأكيد في المرحلة 6 مرفوض، لأن إعادة التسعير بترفض الباكيج على مكان معطّل (D-87، D-95)، والموظف ينقله لمكان نشط الأول. ده متسق مع "المعطّل لا يُستخدم لحجز جديد"، لأن التأكيد هو اللي بيقفل الموعد فعلًا.
+
+---
+
+## قرارات مالك المنتج (2026-10-18)
+
+| السؤال | القرار |
+|---|---|
+| Q5-01 | موافق، **بشرط** إن `markConfirmed` ماتبقاش متاحة من أي Server Action أو شاشة في المرحلة دي، والاختبارات بس اللي تستخدمها، **بقاعدة lint أو اختبار يضمن ده**. التنفيذ: الاتنين (D-97، القسم 5). |
+| Q5-02 | موافق (من النهارده لحد 3 سنين). **وبند للمرحلة 6:** إدخال الحجوزات القائمة وقت تشغيل قاعة جديدة — تسجيل دفعة بتاريخ قديم، بصلاحية واضحة، ومتسجلة في السجل (D-109، ROADMAP المرحلة 6). |
+| Q5-03 | التعديل العادي ميجددش الصلاحية. **وزرار "تمديد" صريح** بيمد الصلاحية بمدة `tentative_hold_hours` من وقت الضغط، لمن عنده `bookings.edit`، ويتسجل في السجل. السبب: العميل بيطلب مهلة كتير، ومن غيره الموظف هيلغي ويعيد الحجز (D-101). |
+| Q5-04 | موافق: الوقت الفاصل الحالي وقت التأكيد (D-110). |
+| P5-01..P5-14، Q5-05..Q5-11 | موافق على الترشيحات. |
+
+**إضافات على الخطة بسبب القرارات:**
+
+- **`bookings.extendTentative(id, version)`** بصلاحية `bookings.edit`: للمبدئي بس (حتى لو منتهي)، و `tentative_expires_at = الآن + tentative_hold_hours`، ويزوّد `version`، ويتسجل في سجل العمليات (`bookings.extend_tentative`) بالصلاحية قبل وبعد. زرار "تمديد" في صفحة الحجز.
+- **الاختبارات الإضافية:**
+  - B-21: التمديد بيحسب من وقت الضغط (لمبدئي ساري ولمبدئي منتهي)، والمنتهي بيرجع "مبدئي"، و `version` قديم مرفوض، والمؤكد مرفوض، والمحاسب (من غير `bookings.edit`) مرفوض، وسطر في سجل العمليات.
+  - B-22: `blocked_until` بيتحسب بالوقت الفاصل الحالي مع تعديل المبدئي ومع `markConfirmed` (D-110).
+  - G-01 (وحدات): مفيش ملف في `src/` غير `confirm-transition.ts` بيذكر `confirm-transition` أو `markConfirmed`؛ وقاعدة ESLint بترفض ملف تجريبي بيستورده (D-97).
+  - E-11: تمديد مبدئي منتهي من صفحته ← يرجع "مبدئي" بتاريخ انتهاء جديد.

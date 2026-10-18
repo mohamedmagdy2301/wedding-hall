@@ -26,7 +26,9 @@
 | min_deposit_value | bigint | قروش إن fixed، أو نسبة×100 (basis points) إن percent |
 | cancellation_basis | enum(`deposit`,`total_paid`) | |
 | postpone_credit_mode | enum(`refund`,`services`,`both`) | |
-| booking_seq, receipt_seq | bigint | عدادات الترقيم (أو sequences منفصلة) |
+
+### booking_counters
+`venue_id, year int, last_no int`، والمفتاح `(venue_id, year)` (D-105). رقم الحجز الجديد = `INSERT … ON CONFLICT DO UPDATE SET last_no = last_no + 1 RETURNING` داخل Transaction الإنشاء، فلا يتكرر تحت التوازي ولا يضيع عند الفشل (BR-26). عداد الإيصالات (المرحلة 6) يُحدد في خطتها.
 
 ### cancellation_tiers
 `id, venue_id, min_days_before int ≥ 0, refund_bps int (0–10000)`
@@ -90,7 +92,7 @@
 
 ### customers
 `id, venue_id, name, phone, alt_phone null, notes null`
-فهرس غير فريد على `(venue_id, phone)` (D-28: لا منع للتكرار). أرقام الموبايل تُخزن موحّدة بصيغة `01XXXXXXXXX` (D-52).
+فهرس غير فريد على `(venue_id, phone)` و `(venue_id, alt_phone)` (D-28: لا منع للتكرار). أرقام الموبايل (والثاني) تُخزن موحّدة بصيغة `01XXXXXXXXX` (D-52، D-106)، والاسم 1–80، والملاحظات ≤ 500. لا حذف (D-107).
 
 ### bookings
 | العمود | النوع | ملاحظات |
@@ -104,12 +106,12 @@
 | slot_kind | enum(day, evening, full_day) | |
 | starts_at, ends_at | timestamptz | `ends_at > starts_at` |
 | blocked_until | timestamptz | `ends_at + buffer` وقت الحفظ |
-| guests | int null | مطلوب للتأكيد |
+| guests | int null | مطلوب للتأكيد، ومع الباكيج؛ 1–100000 |
 | package_id | uuid null | مطلوب للتأكيد |
 | status | enum(`tentative`,`confirmed`,`cancelled`) | |
 | tentative_expires_at | timestamptz null | |
 | season_id | uuid null | لقطة: الموسم الذي طُبق سعره، وفارغ مع السعر العادي (D-88) |
-| base_price, extra_guests_amount, items_total, removal_credits_total, discount_amount, total | bigint | لقطة السعر |
+| base_price, extra_guests_amount, items_total, removal_credits_total, discount_amount, total | bigint null | لقطة السعر: للمبدئي آخر عرض سعر (D-41)، وتُثبت عند التأكيد. فارغة كلها بلا باكيج وموجودة كلها معه (D-103) |
 | base_guests | int null | لقطة من الباكيج وقت التأكيد (D-35) |
 | extra_guest_price | bigint null | لقطة من الباكيج وقت التأكيد؛ تُستخدم لرد تخفيض المعازيم (D-35) |
 | cancellation_basis | enum(`deposit`,`total_paid`) null | لقطة سياسة الإلغاء وقت التأكيد (D-68) |
@@ -130,6 +132,12 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
   ) WHERE (status = 'confirmed');
 ```
 (الحجز `completed` محسوب من `confirmed`، فيظل مشمولًا.)
+
+**قيود إضافية (D-98، D-103، D-107):**
+- `ends_at > starts_at`، و `ends_at − starts_at ≤ 24 ساعة`، و `blocked_until ≥ ends_at` (BR-04، BR-10).
+- المؤكد: `event_type_id` و `package_id` و `guests` و `total` و `confirmed_at` و `confirmed_by` و `cancellation_basis` و `cancellation_tiers` غير فارغة. المبدئي: `tentative_expires_at` غير فارغ. الملغي: `cancelled_at` و `cancelled_by` و `cancel_reason` غير فارغة.
+- أعمدة السعر و `base_guests` و `extra_guest_price` كلها فارغة أو كلها موجودة مع `package_id`، والمعازيم مطلوبة مع الباكيج؛ المبالغ ≥ 0.
+- trigger يمنع حذف أي حجز، ويمنع حذف سطور `booking_items` إلا لحجز مبدئي.
 
 ### booking_items
 | العمود | ملاحظات |
@@ -205,7 +213,7 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 
 ## 8. فهارس مهمة
 
-- `bookings (space_id, starts_at)` للتقويم.
+- `bookings (space_id, starts_at)` للتقويم، و `bookings (customer_id)` لصفحة العميل.
 - `bookings (status, starts_at)` للرئيسية.
 - `payments (booking_id)`, `payments (paid_at)` للتقارير.
 - `installments (due_date)`.

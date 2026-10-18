@@ -19,7 +19,7 @@
 `settings.get`, `settings.updateVenue(name, phone, address)`, `settings.updateTiming(bufferMinutes, tentativeHoldHours)` (يُرفض إن كسر BR-02 في أي مكان — D-51)، `settings.updatePolicies(minDeposit, cancellationBasis, tiers[], postponeCreditMode, confirmNoRefund?)` (D-73؛ `confirmNoRefund` مطلوب إن كانت كل الشرائح 0% — D-74)، إضافة/تعديل/تفعيل/تعطيل/ترتيب لـ `eventTypes`, `paymentMethods`, `expenseCategories` مع `addSuggested` (D-71)، و `setup.checklist` (للمالك).
 
 ## Catalog — `catalog.manage`
-CRUD لـ `spaces` (مع `slots`)، `seasons` (D-66)، `services`، `packages` (مع `prices[]` و `items[]`). لا حذف: التعطيل بـ `is_active` (D-82).
+CRUD لـ `spaces` (مع `slots`، و `spaces.upcomingBookings(spaceId)` لتحذير التعطيل — D-75، D-112)، `seasons` (D-66)، `services`، `packages` (مع `prices[]` و `items[]`). لا حذف: التعطيل بـ `is_active` (D-82).
 - `services.create(name, category, pricingType, unitPrice, allowExternal, externalFee)`، `services.update(serviceId, …)` (تغيير `pricingType` يُرفض إن كانت الخدمة مضمنة في باكيج — D-80)، `services.setActive(serviceId, active)`.
 - `packages.create(spaceId, name, description, baseGuests, extraGuestPrice, isActive, prices[{slotKind, seasonId|null, price}], items[{serviceId, quantity, removable, removalCredit}])`.
 - `packages.update(packageId, version, …نفس الحقول عدا spaceId)` و `packages.setActive(packageId, version, active)`: إن تغيّر `version` منذ فتح الصفحة ← `CONCURRENT_MODIFICATION` (D-81). التفعيل بلا سعر عادي ← `BUSINESS_RULE_VIOLATION` (BR-30، D-78).
@@ -32,16 +32,25 @@ CRUD لـ `spaces` (مع `slots`)، `seasons` (D-66)، `services`، `packages` (
 للقراءة فقط: لا يكتب شيئًا ولا سجل عمليات، ويقرأ الأسعار الحالية في كل مرة. يُرفض: باكيج معطّل أو على مكان معطّل (BR-06)، فترة بلا سعر عادي (BR-30)، إزالة غير مسموحة (BR-33)، خارجي غير مسموح (BR-34)، إجمالي سالب (BR-35)، خصم أكبر من الإجمالي قبل الخصم (BR-52)، خدمة معطّلة أو إضافة مضمنة غير مسموحة (D-87، D-90).
 
 ## Availability — `bookings.view`
-`availability.check(spaceId, startsAt, endsAt, excludeBookingId?)` ← `{ available, conflicts[] }`
-`availability.calendar(spaceIds[], from, to)` ← الحجوزات للعرض.
+`availability.check(spaceId, eventDate, slotKind, startTime?, endTime?, excludeBookingId?)` ← `{ startsAt, endsAt, blockedUntil, confirmedConflicts[], tentativeOverlaps[] }` (D-99): السيرفر يحسب الأوقات بتوقيت القاهرة والوقت الفاصل الحالي (D-100).
+`availability.calendar(spaceIds[], from, to)` ← الحجوزات للعرض بحالتها المعروضة، والنطاق ≤ 42 يومًا.
+
+## Customers (D-106)
+| العملية | الصلاحية | ملاحظات |
+|---|---|---|
+| `customers.lookupByPhone(phone)` | `bookings.create` | اقتراح العميل في المعالج بالموبايل أو الموبايل الثاني (D-28) |
+| `customers.list(search, page)`، `customers.get(id)` | `bookings.view` | S-08، والعميل بحجوزاته |
+| `customers.create(name, phone, altPhone?, notes?)`، `customers.update(id, …)` | `customers.manage` | من S-08؛ العميل الجديد من المعالج يُنشأ داخل `bookings.createTentative` |
 
 ## Bookings
 | العملية | الصلاحية | ملاحظات |
 |---|---|---|
-| `bookings.createTentative` | create | الحد الأدنى D-09 |
+| `bookings.createTentative(spaceId, eventDate, slotKind, startTime?, endTime?, customer: {customerId} \| {name, phone, altPhone?}, eventTypeId?, groomName?, brideName?, packageId?, guests?, items[], removedServiceIds[], notes?)` | create | الحد الأدنى D-09؛ يرجع الرقم وتاريخ الانتهاء والتحذيرات (BR-12، D-102) |
+| `bookings.updateTentative(id, version, …نفس الحقول)` | edit | للمبدئي فقط؛ يعيد التسعير إن تغيّرت مدخلات السعر، ولا يجدد الصلاحية (D-101) |
+| `bookings.extendTentative(id, version)` | edit | `tentative_expires_at = الآن + tentative_hold_hours` (D-101) |
 | `bookings.createConfirmed` | create + payments.record | مع عربون وأقساط |
-| `bookings.confirm(id, deposit, installments[])` | confirm + payments.record | BR-21/22 |
-| `bookings.updateDetails` | edit | بيانات غير مالية |
+| `bookings.confirm(id, version, deposit, installments[])` | confirm + payments.record | BR-21/22؛ المرحلة 6، والانتقال للحالة المؤكدة عبر `markConfirmed` فقط (D-97) |
+| `bookings.updateDetails(id, version, eventTypeId, groomName, brideName, notes, customerId)` | edit | بيانات غير مالية لأي حجز غير ملغي |
 | `bookings.updateItems(id, version, changes, installments?, creditResolution?)` | edit | BR-40..43؛ يشمل تغيير عدد المعازيم (D-35)، وإعادة ضبط الأقساط إن تغيّر الإجمالي (D-34) |
 | `bookings.postpone(id, version, newDate, slotKind, times, creditResolution?)` | postpone | BR-80..85 |
 | `bookings.cancelPreview(id)` | cancel | الأيام، الشريحة، الأساس، المقترح |
