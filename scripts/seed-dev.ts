@@ -80,7 +80,10 @@ async function seedDemoBookings(
     items: [],
     removedServiceIds: [],
   };
-  const book = (input: Partial<Parameters<typeof createTentative>[2]> & { spaceId: string; eventDate: string }, at = deps.now) =>
+  const book = (
+    input: Partial<Parameters<typeof createTentative>[2]> & { spaceId: string; eventDate: string },
+    at = deps.now,
+  ) =>
     createTentative({ ...deps, now: at }, owner, {
       ...base,
       slotKind: "evening",
