@@ -11,7 +11,15 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { paths: [{ name: "fast-check", message: "fast-check is a dev dependency for tests only (D-96)." }] },
+        {
+          paths: [{ name: "fast-check", message: "fast-check is a dev dependency for tests only (D-96)." }],
+          patterns: [
+            {
+              group: ["**/confirm-transition"],
+              message: "markConfirmed is not reachable from any Server Action or screen in phase 5; tests only (D-97).",
+            },
+          ],
+        },
       ],
     },
   },
