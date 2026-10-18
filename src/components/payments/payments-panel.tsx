@@ -165,9 +165,9 @@ export function PaymentsPanel(props: {
               <TableHeader>
                 <TableRow>
                   <TableHead>{tp.receiptNo}</TableHead>
+                  <TableHead>{tp.amount}</TableHead>
                   <TableHead>{t.payments.receipt.kind}</TableHead>
                   <TableHead>{tp.paidAt}</TableHead>
-                  <TableHead>{tp.amount}</TableHead>
                   <TableHead>{tp.method}</TableHead>
                   <TableHead>{tp.receivedBy}</TableHead>
                   <TableHead>{t.common.actions}</TableHead>
@@ -183,6 +183,9 @@ export function PaymentsPanel(props: {
                     <TableCell dir="ltr" className="text-end">
                       {pay.receiptNo}
                     </TableCell>
+                    <TableCell className={cn("whitespace-nowrap tabular-nums", pay.voidedAt && "line-through")}>
+                      {formatPiasters(pay.amount)}
+                    </TableCell>
                     <TableCell>
                       {tp.kinds[pay.kind]}
                       {pay.voidedAt && (
@@ -193,9 +196,6 @@ export function PaymentsPanel(props: {
                       )}
                     </TableCell>
                     <TableCell>{formatCairoDateTime(pay.paidAt)}</TableCell>
-                    <TableCell className={cn("tabular-nums", pay.voidedAt && "line-through")}>
-                      {formatPiasters(pay.amount)}
-                    </TableCell>
                     <TableCell>{pay.methodName}</TableCell>
                     <TableCell>{pay.receivedByName}</TableCell>
                     <TableCell>
