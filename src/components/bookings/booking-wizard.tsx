@@ -32,11 +32,14 @@ import type { BookingFormOptions, TentativeForEdit } from "@/modules/bookings/qu
 import type { ActionError, ActionResult } from "@/server/action-core";
 import {
   checkAvailabilityAction,
+  createConfirmedAction,
   createTentativeAction,
   lookupCustomerAction,
   updateTentativeAction,
 } from "@/server/actions/bookings";
 import { quotePriceAction } from "@/server/actions/pricing";
+import { ConfirmDepositDialog } from "@/components/payments/confirm-deposit-dialog";
+import type { PaymentFormOptions } from "@/modules/payments/queries";
 import { PriceBreakdownView, type BreakdownView } from "./price-breakdown";
 
 const tw = t.bookings.wizard;
@@ -104,19 +107,22 @@ function useLive<R>(request: object | null, run: (input: unknown) => Promise<Act
 
 /**
  * S-06 (UF-03): the booking wizard in five steps with the live price beside it (below on
- * mobile). "Save as tentative" is available from the first step (D-09); confirming with a
- * deposit is phase 6 (D-97). The same wizard edits a tentative booking (D-101).
+ * mobile). "Save as tentative" is available from the first step (D-09); "confirm with a
+ * deposit" saves it confirmed at once (BR-23) for whoever may confirm (D-123). The same
+ * wizard edits a tentative booking (D-101), which is confirmed from its page.
  */
 export function BookingWizard({
   options,
   booking,
   prefill = {},
   canView,
+  paymentOptions = null,
 }: {
   options: BookingFormOptions;
   booking?: TentativeForEdit;
   prefill?: WizardPrefill;
   canView: boolean;
+  paymentOptions?: PaymentFormOptions | null;
 }) {
   const router = useRouter();
   const selectableSpaces = options.spaces.filter((s) => s.isActive || s.id === booking?.spaceId);
@@ -152,6 +158,7 @@ export function BookingWizard({
 
   const [error, setError] = useState<ActionError | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [showPriceMobile, setShowPriceMobile] = useState(false);
 
@@ -666,7 +673,6 @@ export function BookingWizard({
         </Alert>
       )}
       <p className="text-muted-foreground">{fill(tw.expiresNote, { hours: options.timing.tentativeHoldHours })}</p>
-      <p className="text-muted-foreground">{tw.confirmLater}</p>
     </div>,
   ];
 
@@ -737,12 +743,24 @@ export function BookingWizard({
               {tw.next}
             </Button>
           )}
+          {!booking && paymentOptions && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={saving || !price || !hasCustomer}
+              onClick={() => setConfirming(true)}
+              data-testid="wizard-confirm"
+              className="ms-auto"
+            >
+              {tw.confirmDeposit}
+            </Button>
+          )}
           <Button
             type="button"
             disabled={saving || !spaceId || !eventDate}
             onClick={save}
             data-testid="save-tentative"
-            className="ms-auto"
+            className={cn(!(!booking && paymentOptions) && "ms-auto")}
           >
             {saving ? tw.saving : booking ? tw.saveChanges : tw.saveTentative}
           </Button>
@@ -767,6 +785,23 @@ export function BookingWizard({
           <span className="tabular-nums">{priceView ? formatPiasters(priceView.total) : "—"}</span>
         </button>
       </div>
+
+      {confirming && paymentOptions && price && (
+        <ConfirmDepositDialog
+          open
+          onOpenChange={setConfirming}
+          title={t.payments.confirm.createTitle}
+          total={price.total}
+          eventDate={eventDate}
+          options={paymentOptions}
+          submit={(fields) => createConfirmedAction({ ...payload(), ...fields })}
+          onDone={(data) => {
+            setConfirming(false);
+            router.push(`/bookings/${data.id}`);
+            router.refresh();
+          }}
+        />
+      )}
 
       <Dialog open={quickOpen} onOpenChange={setQuickOpen}>
         <DialogContent>

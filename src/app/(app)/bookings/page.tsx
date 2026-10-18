@@ -29,13 +29,14 @@ export default async function BookingsPage({ searchParams }: PageProps<"/booking
     slotKind: pick("slotKind"),
     from: pick("from"),
     to: pick("to"),
+    balance: pick("balance"),
     page: pick("page"),
   });
   const data = await getBookingsPageData(filters);
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
   const query = (page: number) => {
     const params = new URLSearchParams();
-    for (const key of ["search", "status", "spaceId", "slotKind", "from", "to"] as const) {
+    for (const key of ["search", "status", "spaceId", "slotKind", "from", "to", "balance"] as const) {
       const value = filters[key];
       if (value) params.set(key, value);
     }
@@ -67,13 +68,14 @@ export default async function BookingsPage({ searchParams }: PageProps<"/booking
               <TableHead>{tb.slot}</TableHead>
               <TableHead>{tb.customer}</TableHead>
               <TableHead>{tb.total}</TableHead>
+              <TableHead>{tb.remaining}</TableHead>
               <TableHead>{tb.status}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
+                <TableCell colSpan={8} className="text-muted-foreground">
                   {tb.empty}
                 </TableCell>
               </TableRow>
@@ -108,8 +110,14 @@ export default async function BookingsPage({ searchParams }: PageProps<"/booking
                     formatPiasters(row.total)
                   )}
                 </TableCell>
+                <TableCell className="whitespace-nowrap tabular-nums" data-testid="booking-remaining">
+                  {row.remaining === null ? "—" : formatPiasters(row.remaining)}
+                </TableCell>
                 <TableCell>
-                  <StatusBadge status={row.displayStatus} />
+                  <StatusBadge
+                    status={row.displayStatus}
+                    owing={row.displayStatus === "completed" && (row.remaining ?? 0) > 0}
+                  />
                 </TableCell>
               </TableRow>
             ))}

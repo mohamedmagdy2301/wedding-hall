@@ -14,7 +14,15 @@ const ALL = "all";
 
 type Props = {
   spaces: { id: string; name: string }[];
-  values: { search: string; status: string; spaceId: string | null; slotKind: string; from: string; to: string };
+  values: {
+    search: string;
+    status: string;
+    spaceId: string | null;
+    slotKind: string;
+    from: string;
+    to: string;
+    balance: string;
+  };
 };
 
 /** S-05 filters as a plain GET form: they live in the URL (like S-16). */
@@ -81,6 +89,7 @@ export function BookingsFilters({ spaces, values }: Props) {
         tf.allSlots,
         SLOT_KINDS.map((k) => [k, t.bookings.slotKinds[k]]),
       )}
+      {select("bookings-balance", "balance", tf.balance, values.balance, tf.allBalances, [["due", tf.due]])}
       <div className="grid gap-1.5">
         <Label htmlFor="bookings-from">{tf.from}</Label>
         <Input id="bookings-from" type="date" name="from" defaultValue={values.from} />

@@ -12,18 +12,29 @@ export const STATUS_STYLES: Record<DisplayStatus, string> = {
   cancelled: "border-zinc-300 bg-zinc-100 text-zinc-500 line-through dark:bg-zinc-900 dark:text-zinc-400",
 };
 
-export function StatusBadge({ status, className }: { status: DisplayStatus; className?: string }) {
+/** `owing`: a completed booking with money still due shows "تم – عليه متبقي" (BR-24, D-23). */
+export function StatusBadge({
+  status,
+  className,
+  owing,
+}: {
+  status: DisplayStatus;
+  className?: string;
+  owing?: boolean;
+}) {
   return (
     <span
       data-testid="booking-status"
       data-status={status}
+      data-owing={owing ? "true" : undefined}
       className={cn(
         "inline-flex h-5 items-center rounded-4xl border px-2 text-xs font-medium whitespace-nowrap",
         STATUS_STYLES[status],
+        owing && "border-orange-300 bg-orange-50 text-orange-900 dark:bg-orange-950 dark:text-orange-100",
         className,
       )}
     >
-      {t.bookings.statuses[status]}
+      {owing ? t.bookings.completedDue : t.bookings.statuses[status]}
     </span>
   );
 }

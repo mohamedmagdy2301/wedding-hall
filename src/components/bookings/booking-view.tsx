@@ -15,7 +15,10 @@ import { formatPiasters } from "@/domain/money";
 import { formatCount } from "@/lib/digits";
 import { fill, t } from "@/lib/i18n";
 import { formatCairoDateTime, formatCairoTime, formatIsoDate, formatIsoWeekday } from "@/lib/time";
-import { extendTentativeAction } from "@/server/actions/bookings";
+import { ConfirmDepositDialog } from "@/components/payments/confirm-deposit-dialog";
+import { PaymentsPanel, type PaymentsData } from "@/components/payments/payments-panel";
+import type { PaymentFormOptions } from "@/modules/payments/queries";
+import { confirmBookingAction, extendTentativeAction } from "@/server/actions/bookings";
 import { PriceBreakdownView, type BreakdownView } from "./price-breakdown";
 import { StatusBadge } from "./status-badge";
 
@@ -69,7 +72,11 @@ export type BookingViewData = {
     action: string;
     changes: { field: string; before: unknown; after: unknown }[];
   }[];
+  money: PaymentsData;
   canEdit: boolean;
+  canConfirm: boolean;
+  canVoid: boolean;
+  paymentOptions: PaymentFormOptions | null;
   holdHours: number;
 };
 
@@ -82,11 +89,12 @@ function show(field: string, value: unknown): string {
   return String(value);
 }
 
-/** S-07: the booking's header, actions and tabs (summary, items and price, history — D-108). */
+/** S-07: the booking's header, actions and tabs (summary, items and price, payments, history — D-108). */
 export function BookingView({ data }: { data: BookingViewData }) {
   const router = useRouter();
   const { booking: b } = data;
   const [extending, setExtending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const extend = useServerAction(extendTentativeAction);
   const isTentative = b.status === "tentative";
 
@@ -114,8 +122,16 @@ export function BookingView({ data }: { data: BookingViewData }) {
         <h1 className="text-2xl font-bold" dir="ltr">
           {b.bookingNo}
         </h1>
-        <StatusBadge status={b.displayStatus} />
+        <StatusBadge
+          status={b.displayStatus}
+          owing={b.displayStatus === "completed" && data.money.ledger.remaining > 0}
+        />
         <div className="ms-auto flex gap-2">
+          {isTentative && data.canConfirm && data.paymentOptions && (
+            <Button onClick={() => setConfirming(true)} data-testid="confirm-booking">
+              {tp.confirm}
+            </Button>
+          )}
           {isTentative && data.canEdit && (
             <>
               <Button variant="outline" onClick={() => setExtending(true)} data-testid="extend-booking">
@@ -151,6 +167,14 @@ export function BookingView({ data }: { data: BookingViewData }) {
             <span className="text-muted-foreground">{t.bookings.total}: </span>
             {b.total === null ? t.bookings.noPrice : formatPiasters(b.total)}
           </p>
+          {b.status === "confirmed" && (
+            <p data-testid="booking-balance">
+              <span className="text-muted-foreground">{t.payments.paid}: </span>
+              {formatPiasters(data.money.ledger.paid)}
+              <span className="text-muted-foreground"> — {t.payments.remaining}: </span>
+              {formatPiasters(data.money.ledger.remaining)}
+            </p>
+          )}
           {isTentative && b.tentativeExpiresAt && (
             <p className="sm:col-span-2" data-testid="booking-expiry">
               <span className="text-muted-foreground">
@@ -175,6 +199,9 @@ export function BookingView({ data }: { data: BookingViewData }) {
         <TabsList>
           <TabsTrigger value="summary">{tp.tabs.summary}</TabsTrigger>
           <TabsTrigger value="items">{tp.tabs.items}</TabsTrigger>
+          <TabsTrigger value="payments" data-testid="tab-payments">
+            {tp.tabs.payments}
+          </TabsTrigger>
           <TabsTrigger value="history">{tp.tabs.history}</TabsTrigger>
         </TabsList>
         <TabsContent value="summary">
@@ -206,7 +233,6 @@ export function BookingView({ data }: { data: BookingViewData }) {
                   {b.createdByName} — {formatCairoDateTime(b.createdAt)}
                 </dd>
               </dl>
-              <p className="mt-4 text-xs text-muted-foreground">{tp.paymentsLater}</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -220,6 +246,14 @@ export function BookingView({ data }: { data: BookingViewData }) {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="payments">
+          <PaymentsPanel
+            booking={{ id: b.id, bookingNo: b.bookingNo, version: b.version, status: b.status, eventDate: b.eventDate }}
+            money={data.money}
+            options={data.paymentOptions}
+            canVoid={data.canVoid}
+          />
         </TabsContent>
         <TabsContent value="history">
           <Card className="py-4">
@@ -251,6 +285,22 @@ export function BookingView({ data }: { data: BookingViewData }) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {confirming && data.paymentOptions && (
+        <ConfirmDepositDialog
+          open
+          onOpenChange={setConfirming}
+          title={`${t.payments.confirm.title} ${b.bookingNo}`}
+          total={b.total ?? 0}
+          eventDate={b.eventDate}
+          options={data.paymentOptions}
+          submit={(fields) => confirmBookingAction({ ...fields, bookingId: b.id, version: b.version })}
+          onDone={() => {
+            setConfirming(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={extending}

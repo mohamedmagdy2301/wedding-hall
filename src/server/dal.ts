@@ -16,6 +16,8 @@ import type { BookingListFilters, CalendarInput } from "@/modules/bookings/schem
 import { listServices } from "@/modules/catalog/services";
 import { getCustomer, listCustomers } from "@/modules/customers/service";
 import { getNewPackageOptions, getPackage, listPackages } from "@/modules/packages/service";
+import { getPaymentFormOptions, getReceipt, listCollections } from "@/modules/payments/queries";
+import type { CollectionsFilters } from "@/modules/payments/schemas";
 import { resolveSession, type SessionUser } from "@/modules/auth/sessions";
 import { getSetupChecklist } from "@/modules/settings/checklist";
 import { listItems } from "@/modules/settings/lists";
@@ -166,7 +168,14 @@ export async function getHomeSetupCard() {
 /** S-06 new booking (`bookings.create`). The live price and availability need `bookings.view` too. */
 export async function getNewBookingPageData() {
   const actor = await requireAccess("bookings.create");
-  return { options: await getBookingFormOptions(getDb(), actor), canView: satisfies(actor, "bookings.view") };
+  const db = getDb();
+  // Saving as confirmed needs bookings.confirm and payments.record too (D-123).
+  const canConfirm = satisfies(actor, "bookings.confirm") && satisfies(actor, "payments.record");
+  const [options, paymentOptions] = await Promise.all([
+    getBookingFormOptions(db, actor),
+    canConfirm ? getPaymentFormOptions(db, actor) : null,
+  ]);
+  return { options, paymentOptions, canView: satisfies(actor, "bookings.view") };
 }
 
 async function orNotFound<T>(id: string, read: () => Promise<T>): Promise<T> {
@@ -193,8 +202,19 @@ export async function getBookingPageData(bookingId: string) {
   const actor = await requireAccess("bookings.view");
   const db = getDb();
   const data = await orNotFound(bookingId, () => getBooking(db, actor, bookingId, new Date()));
-  const timing = await getTiming(db, actor.venueId);
-  return { ...data, canEdit: satisfies(actor, "bookings.edit"), holdHours: timing.tentativeHoldHours };
+  const canRecord = satisfies(actor, "payments.record");
+  const [timing, paymentOptions] = await Promise.all([
+    getTiming(db, actor.venueId),
+    canRecord ? getPaymentFormOptions(db, actor) : null,
+  ]);
+  return {
+    ...data,
+    canEdit: satisfies(actor, "bookings.edit"),
+    canConfirm: satisfies(actor, "bookings.confirm") && canRecord,
+    canVoid: satisfies(actor, "payments.void"),
+    paymentOptions,
+    holdHours: timing.tentativeHoldHours,
+  };
 }
 
 /** S-05 (`bookings.view`). */
@@ -223,4 +243,21 @@ export async function getCustomerPageData(customerId: string) {
   const actor = await requireAccess("bookings.view");
   const data = await orNotFound(customerId, () => getCustomer(getDb(), actor, customerId, new Date()));
   return { ...data, canManage: satisfies(actor, "customers.manage") };
+}
+
+/** S-09 (`payments.record`, D-123). */
+export async function getCollectionsPageData(filters: CollectionsFilters) {
+  const actor = await requireAccess("payments.record");
+  const db = getDb();
+  const [result, paymentOptions] = await Promise.all([
+    listCollections(db, actor, filters, new Date()),
+    getPaymentFormOptions(db, actor),
+  ]);
+  return { ...result, paymentOptions };
+}
+
+/** P-03 / P-04 (`bookings.view`): the receipt as of its issuance (D-122). */
+export async function getReceiptPageData(paymentId: string) {
+  const actor = await requireAccess("bookings.view");
+  return orNotFound(paymentId, () => getReceipt(getDb(), actor, paymentId));
 }

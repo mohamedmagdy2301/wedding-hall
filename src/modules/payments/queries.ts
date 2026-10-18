@@ -7,7 +7,8 @@ import { addDays, cairoDate } from "@/lib/time";
 import type { SessionUser } from "@/modules/auth/sessions";
 import type { DbOrTx } from "@/modules/shared/db";
 import { notFound } from "@/modules/shared/errors";
-import { assertAllowed } from "@/modules/users-rbac/authorize";
+import { readVenuePolicies } from "@/modules/settings/venue";
+import { assertAllowed, satisfies } from "@/modules/users-rbac/authorize";
 import { readLedgerRows, readSchedule } from "./repository";
 import type { CollectionsFilters } from "./schemas";
 
@@ -173,3 +174,27 @@ export async function listCollections(db: DbOrTx, actor: SessionUser, filters: C
   );
   return { rows, from, to, today };
 }
+
+/**
+ * What the deposit and payment forms choose from (`payments.record`): the active methods, the
+ * minimum-deposit policy for the hint (D-119; the server decides) and whether the actor may
+ * date a payment in the past (D-118).
+ */
+export async function getPaymentFormOptions(db: DbOrTx, actor: SessionUser) {
+  assertAllowed(actor, "payments.record");
+  const [methods, policies] = await Promise.all([
+    db
+      .select({ id: paymentMethods.id, name: paymentMethods.name })
+      .from(paymentMethods)
+      .where(and(eq(paymentMethods.venueId, actor.venueId), eq(paymentMethods.isActive, true)))
+      .orderBy(asc(paymentMethods.sortOrder), asc(paymentMethods.name)),
+    readVenuePolicies(db, actor.venueId),
+  ]);
+  return {
+    methods,
+    minDeposit: { minDepositType: policies.minDepositType, minDepositValue: policies.minDepositValue },
+    canBackdate: satisfies(actor, "payments.backdate"),
+  };
+}
+
+export type PaymentFormOptions = Awaited<ReturnType<typeof getPaymentFormOptions>>;

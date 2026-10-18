@@ -18,11 +18,12 @@ export default async function NewBookingPage({ searchParams }: PageProps<"/booki
   const raw = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined;
   const prefill = prefillSchema.parse({ space: one(raw.space), date: one(raw.date), slot: one(raw.slot) });
-  const { options, canView } = await getNewBookingPageData();
+  const { options, canView, paymentOptions } = await getNewBookingPageData();
   return (
     <BookingWizard
       options={options}
       canView={canView}
+      paymentOptions={paymentOptions}
       prefill={{ spaceId: prefill.space, date: prefill.date, slot: prefill.slot }}
     />
   );
