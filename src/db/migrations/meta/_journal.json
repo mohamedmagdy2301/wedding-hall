@@ -57,6 +57,13 @@
       "when": 1792332956834,
       "tag": "0007_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792877963517,
+      "tag": "0008_post_confirmation",
+      "breakpoints": true
     }
   ]
 }

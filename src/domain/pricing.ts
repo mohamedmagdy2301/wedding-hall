@@ -162,11 +162,16 @@ export type Totals = Pick<
   "itemsTotal" | "externalFeesTotal" | "removalCreditsTotal" | "subtotal" | "total"
 >;
 
+/** What `summarize` reads of a line: the engine's, or a stored one with its `guest_adjustment` lines (D-92). */
+export type SummedLine = Pick<PriceLine, "isRemoved" | "removalCredit" | "isExternal" | "externalFee" | "lineTotal"> & {
+  source: PriceLine["source"] | "guest_adjustment";
+};
+
 /** BR-32 over stored parts (D-84, D-85): the only place the totals are added up. */
 export function summarize(parts: {
   basePrice: number;
   extraGuestsAmount: number;
-  lines: readonly PriceLine[];
+  lines: readonly SummedLine[];
   discountAmount: number;
 }): Totals {
   let itemsTotal = 0;

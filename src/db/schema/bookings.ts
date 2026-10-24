@@ -13,6 +13,7 @@ import {
   timestamp,
   unique,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { packages, pricingTypeEnum, serviceCategoryEnum, services, slotKindEnum } from "./catalog";
 import { timestamps } from "./columns";
@@ -22,7 +23,7 @@ import { users } from "./users";
 import { cancellationBasisEnum, venues } from "./venues";
 
 export const bookingStatusEnum = pgEnum("booking_status", ["tentative", "confirmed", "cancelled"]);
-/** `guest_adjustment` lines come with phase 7 (D-35); the value exists now so the enum never changes. */
+/** `guest_adjustment`: the lines of guests added after confirmation, at the prices then (D-35, D-92). */
 export const bookingItemSourceEnum = pgEnum("booking_item_source", ["package", "added", "guest_adjustment"]);
 
 const venueId = () =>
@@ -202,16 +203,106 @@ export const bookingItems = pgTable(
     isExternal: boolean("is_external").notNull().default(false),
     externalFee: piasters("external_fee").notNull().default(0),
     lineTotal: piasters("line_total").notNull(),
-    // The engine's line order: included lines in package order, then added lines.
+    // The engine's line order: included lines in package order, then added lines; lines
+    // added after confirmation follow in the order they were added (D-128).
     sortOrder: integer("sort_order").notNull(),
+    // The change that added this line after confirmation; null for the confirmed lines (D-128).
+    changeId: uuid("change_id").references((): AnyPgColumn => bookingChanges.id),
+    // A line taken off a confirmed booking stays, marked (D-107, D-128).
+    voidedAt: instant("voided_at"),
+    voidedBy: uuid("voided_by").references(() => users.id),
+    voidedChangeId: uuid("voided_change_id").references((): AnyPgColumn => bookingChanges.id),
     ...timestamps,
   },
   (t) => [
     index("booking_items_booking_idx").on(t.bookingId),
+    check("booking_items_void_check", sql`num_nonnulls(${t.voidedAt}, ${t.voidedBy}, ${t.voidedChangeId}) IN (0, 3)`),
     check("booking_items_quantity_check", sql`${t.quantity} BETWEEN 1 AND 100000`),
     check(
       "booking_items_amounts_check",
       sql`${t.unitPrice} >= 0 AND ${t.removalCredit} >= 0 AND ${t.externalFee} >= 0`,
     ),
+  ],
+);
+
+export const discountStatusEnum = pgEnum("discount_status", ["pending", "approved", "rejected", "withdrawn"]);
+/** `price_override`: the difference of a price typed below the current one (BR-41, D-129). */
+export const discountSourceEnum = pgEnum("discount_source", ["request", "price_override"]);
+
+/**
+ * Discount requests (BR-50..52, D-129). Only `approved` ones count, as `bookings.discount_amount`.
+ * Never deleted; a request changes once, from pending to its outcome (trigger in 0008).
+ */
+export const discountRequests = pgTable(
+  "discount_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    venueId: venueId(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    amount: piasters("amount").notNull(),
+    reason: text("reason").notNull(),
+    source: discountSourceEnum("source").notNull().default("request"),
+    status: discountStatusEnum("status").notNull().default("pending"),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id),
+    // Who approved, rejected or withdrew it, and when.
+    decidedBy: uuid("decided_by").references(() => users.id),
+    decidedAt: instant("decided_at"),
+    decisionNote: text("decision_note"),
+    ...timestamps,
+  },
+  (t) => [
+    index("discount_requests_booking_idx").on(t.bookingId),
+    index("discount_requests_venue_status_idx").on(t.venueId, t.status),
+    check("discount_requests_amount_check", sql`${t.amount} > 0`),
+    check("discount_requests_reason_check", sql`length(${t.reason}) BETWEEN 3 AND 300`),
+    check(
+      "discount_requests_decision_check",
+      sql`(${t.status} = 'pending') = (${t.decidedBy} IS NULL AND ${t.decidedAt} IS NULL)
+        AND (${t.status} <> 'pending' OR ${t.decisionNote} IS NULL)
+        AND (${t.decisionNote} IS NULL OR length(${t.decisionNote}) <= 300)`,
+    ),
+  ],
+);
+
+export const bookingChangeKindEnum = pgEnum("booking_change_kind", [
+  "postpone",
+  "items",
+  "guests",
+  "price_override",
+  "discount",
+]);
+export const creditResolutionEnum = pgEnum("credit_resolution", ["refund", "services"]);
+
+/**
+ * Every change of a confirmed booking's total (BR-42, BR-85, D-130): before and after, append-only.
+ * The total a receipt was issued against is read from here (D-122).
+ */
+export const bookingChanges = pgTable(
+  "booking_changes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    venueId: venueId(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    kind: bookingChangeKindEnum("kind").notNull(),
+    before: jsonb("before").notNull(),
+    after: jsonb("after").notNull(),
+    totalBefore: piasters("total_before").notNull(),
+    totalAfter: piasters("total_after").notNull(),
+    // How a credit for the customer was settled (BR-83, D-36); null without one.
+    creditResolution: creditResolutionEnum("credit_resolution"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: instant("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("booking_changes_booking_idx").on(t.bookingId, t.createdAt),
+    check("booking_changes_totals_check", sql`${t.totalBefore} >= 0 AND ${t.totalAfter} >= 0`),
   ],
 );
