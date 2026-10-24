@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { bookingItems, bookings, customers, eventTypes, packages, spaces } from "@/db/schema";
 import { bookingDateViolation, bookingTimes, type BookingTimes } from "@/domain/booking-time";
 import type { PriceBreakdown } from "@/domain/pricing";
@@ -14,7 +14,8 @@ import { runTransaction } from "@/modules/shared/transaction";
 import { AppError, notFound, validationError } from "@/modules/shared/errors";
 import { lockSpaceRow, readSpaceWithTiming, type Space } from "@/modules/spaces/service";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
-import { findOverlapping, nextBookingNumber } from "./repository";
+import { approvedDiscount } from "./changes";
+import { findOverlapping, nextBookingNumber, requestedQuantity } from "./repository";
 import type { BookingInput, UpdateDetailsInput, UpdateTentativeInput } from "./schemas";
 
 /**
@@ -100,9 +101,20 @@ async function assertEventType(tx: Tx, venueId: string, eventTypeId: string | nu
   }
 }
 
-/** The current catalog's quote (D-87), or nothing without a package (D-103). */
-async function priceFor(tx: Tx, venueId: string, input: BookingInput): Promise<PriceBreakdown | null> {
-  if (!input.packageId || input.guests === null) return null;
+/**
+ * The current catalog's quote (D-87), or nothing without a package (D-103). Approved discounts
+ * stay with the booking through every re-pricing (Q7-01); without a package they cannot.
+ */
+async function priceFor(
+  tx: Tx,
+  venueId: string,
+  input: BookingInput,
+  discountAmount = 0,
+): Promise<PriceBreakdown | null> {
+  if (!input.packageId || input.guests === null) {
+    if (discountAmount > 0) throw new AppError("BUSINESS_RULE_VIOLATION", "discountNeedsPackage", { rule: "BR-50" });
+    return null;
+  }
   return quoteForVenue(tx, venueId, {
     spaceId: input.spaceId,
     packageId: input.packageId,
@@ -111,7 +123,7 @@ async function priceFor(tx: Tx, venueId: string, input: BookingInput): Promise<P
     guests: input.guests,
     items: input.items,
     removedServiceIds: input.removedServiceIds,
-    discountAmount: 0,
+    discountAmount,
   });
 }
 
@@ -213,7 +225,7 @@ export async function readBookingSnapshot(db: DbOrTx, venueId: string, bookingId
       isExternal: bookingItems.isExternal,
     })
     .from(bookingItems)
-    .where(eq(bookingItems.bookingId, bookingId))
+    .where(and(eq(bookingItems.bookingId, bookingId), isNull(bookingItems.voidedAt)))
     .orderBy(bookingItems.sortOrder);
   return {
     bookingNo: row.bookingNo,
@@ -331,6 +343,7 @@ async function storedChoices(tx: Tx, bookingId: string) {
     .select({
       serviceId: bookingItems.serviceId,
       quantity: bookingItems.quantity,
+      pricingType: bookingItems.pricingType,
       source: bookingItems.source,
       isRemoved: bookingItems.isRemoved,
       isExternal: bookingItems.isExternal,
@@ -338,7 +351,7 @@ async function storedChoices(tx: Tx, bookingId: string) {
     .from(bookingItems)
     .where(eq(bookingItems.bookingId, bookingId));
   return {
-    added: choiceKey(lines.filter((l) => l.source === "added")),
+    added: choiceKey(lines.filter((l) => l.source === "added").map((l) => ({ ...l, quantity: requestedQuantity(l) }))),
     removed: [...lines.filter((l) => l.isRemoved).map((l) => l.serviceId ?? "")].sort().join(","),
   };
 }
@@ -384,7 +397,7 @@ export async function updateTentative(deps: ServiceDeps, actor: SessionUser, inp
     if (moved) assertDateWindow(input.eventDate, times.startsAt, deps.now);
     await assertEventType(tx, venueId, input.eventTypeId, current.eventTypeId);
     if (input.guests !== current.guests || input.spaceId !== current.spaceId) assertCapacity(space, input.guests);
-    const price = repriced ? await priceFor(tx, venueId, input) : undefined;
+    const price = repriced ? await priceFor(tx, venueId, input, await approvedDiscount(tx, current.id)) : undefined;
     const customerId = await resolveCustomer(tx, actor, input.customer);
 
     const [row] = await tx

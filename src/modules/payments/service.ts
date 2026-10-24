@@ -21,7 +21,13 @@ import {
   readSchedule,
   replaceSchedule,
 } from "./repository";
-import type { RecordDepositInput, RecordPaymentInput, SetInstallmentsInput, VoidPaymentInput } from "./schemas";
+import type {
+  RecordDepositInput,
+  RecordPaymentInput,
+  RefundInput,
+  SetInstallmentsInput,
+  VoidPaymentInput,
+} from "./schemas";
 
 /**
  * Payments, the replacement deposit, voiding and the schedule (BR-60..66, D-118..D-126).
@@ -102,7 +108,7 @@ export async function auditPayment(
   });
 }
 
-async function auditSchedule(
+export async function auditSchedule(
   tx: Tx,
   actor: SessionUser,
   booking: { id: string; bookingNo: string },
@@ -315,5 +321,55 @@ export async function setInstallments(deps: ServiceDeps, actor: SessionUser, inp
       .returning({ version: bookingsTable.version });
     await auditSchedule(tx, actor, booking, before, input.installments, "set");
     return { version: row.version };
+  });
+}
+
+/**
+ * `payments.refund` (BR-83, D-36, D-131): a credit the customer has on a confirmed booking —
+ * paid above the total — paid back, up to all of it. Under the `services` policy the credit
+ * stays for services, so it is paid back only once the party is over (BR-67's leftover).
+ * A credit made by a change is refunded inside that change (bookings/changes.ts).
+ */
+export async function refundCredit(deps: ServiceDeps, actor: SessionUser, input: RefundInput) {
+  assertAllowed(actor, "payments.refund");
+  const venueId = actor.venueId;
+  return runTransaction(deps.db, async (tx) => {
+    const booking = await lockBookingForPayment(tx, venueId, input.bookingId);
+    if (booking.status !== "confirmed") throw new AppError("BUSINESS_RULE_VIOLATION", "refundNotConfirmed");
+    const method = await activeMethodName(tx, venueId, input.methodId);
+    const [rows, policies] = await Promise.all([readLedgerRows(tx, booking.id), readVenuePolicies(tx, venueId)]);
+    const credit = netPaid(rows) - (booking.total ?? 0);
+    if (input.amount > credit) {
+      throw new AppError("BUSINESS_RULE_VIOLATION", "refundAboveCredit", {
+        rule: "BR-83",
+        fieldErrors: { amount: "refundAboveCredit" },
+        details: { credit: Math.max(0, credit) },
+      });
+    }
+    if (policies.postponeCreditMode === "services" && booking.endsAt > deps.now) {
+      throw new AppError("BUSINESS_RULE_VIOLATION", "refundCreditForServices", { rule: "BR-83" });
+    }
+    const payment = await insertPayment(tx, {
+      venueId,
+      bookingId: booking.id,
+      kind: "refund",
+      amount: input.amount,
+      methodId: input.methodId,
+      paidAt: deps.now,
+      receivedBy: actor.userId,
+      note: input.reason,
+    });
+    await auditPayment(tx, actor, {
+      ...payment,
+      bookingId: booking.id,
+      bookingNo: booking.bookingNo,
+      kind: "refund",
+      amount: input.amount,
+      paidAt: deps.now,
+      method,
+      note: input.reason,
+      backdated: false,
+    });
+    return { paymentId: payment.id, receiptNo: payment.receiptNo };
   });
 }

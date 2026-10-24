@@ -23,6 +23,9 @@ export async function recordDepositAction(input: unknown) {
 export async function voidPaymentAction(input: unknown) {
   return run(invoke(paymentSpecs.void, input));
 }
+export async function refundCreditAction(input: unknown) {
+  return run(invoke(paymentSpecs.refund, input));
+}
 export async function setInstallmentsAction(input: unknown) {
   return run(invoke(paymentSpecs.setInstallments, input));
 }

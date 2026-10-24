@@ -124,3 +124,10 @@ export async function nextBookingNumber(tx: Tx, venueId: string, year: number): 
     .returning({ lastNo: bookingCounters.lastNo });
   return bookingNumber(year, row.lastNo);
 }
+
+/**
+ * The quantity a stored added line was requested with: a per-guest internal line stores the
+ * guests it covers (D-84), but is requested as 1 — like a fixed one.
+ */
+export const requestedQuantity = (line: { quantity: number; pricingType: string; isExternal: boolean }) =>
+  line.pricingType === "per_unit" ? line.quantity : 1;

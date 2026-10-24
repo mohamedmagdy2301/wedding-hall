@@ -9,9 +9,12 @@ import {
   createConfirmedSchema,
   createTentativeSchema,
   extendTentativeSchema,
+  previewItemsSchema,
   updateDetailsSchema,
+  updateItemsSchema,
   updateTentativeSchema,
 } from "@/modules/bookings/schemas";
+import { previewItems, updateItems } from "@/modules/bookings/amend";
 import { confirmBooking, createConfirmed } from "@/modules/bookings/confirm";
 import { createTentative, extendTentative, updateDetails, updateTentative } from "@/modules/bookings/service";
 import {
@@ -58,6 +61,17 @@ export const bookingSpecs = {
     schema: updateDetailsSchema,
     requires: "bookings.edit",
     handler: (ctx, input) => updateDetails(ctx, ctx.actor, input),
+  }),
+  // Phase 7 (BR-40..43): read-only preview and the save; a refund needs payments.refund too (service).
+  previewItems: defineProtected({
+    schema: previewItemsSchema,
+    requires: "bookings.edit",
+    handler: (ctx, input) => previewItems(ctx.db, ctx.actor, input),
+  }),
+  updateItems: defineProtected({
+    schema: updateItemsSchema,
+    requires: "bookings.edit",
+    handler: (ctx, input) => updateItems(ctx, ctx.actor, input),
   }),
   get: defineProtected({
     schema: bookingIdSchema,

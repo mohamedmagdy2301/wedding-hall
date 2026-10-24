@@ -34,6 +34,15 @@ export type RecordPaymentInput = z.output<typeof recordPaymentSchema>;
 export const recordDepositSchema = recordPaymentSchema.extend({ installments: scheduleSchema.optional() });
 export type RecordDepositInput = z.output<typeof recordDepositSchema>;
 
+/** `payments.refund` (BR-83, D-126): a credit for the customer paid back, with its reason. */
+export const refundSchema = z.object({
+  bookingId: id,
+  amount: paymentAmount,
+  methodId: id,
+  reason: z.string().trim().min(3, "refundReasonInvalid").max(300, "refundReasonInvalid"),
+});
+export type RefundInput = z.output<typeof refundSchema>;
+
 export const voidPaymentSchema = z.object({
   paymentId: id,
   reason: z.string().trim().min(3, "voidReasonInvalid").max(300, "voidReasonInvalid"),

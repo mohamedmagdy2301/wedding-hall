@@ -35,6 +35,13 @@ export async function createConfirmedAction(input: unknown) {
 export async function updateBookingDetailsAction(input: unknown) {
   return run(invoke(bookingSpecs.updateDetails, input));
 }
+export async function updateItemsAction(input: unknown) {
+  return run(invoke(bookingSpecs.updateItems, input));
+}
+/** Read-only, called live by the amend dialog. */
+export async function previewItemsAction(input: unknown) {
+  return invoke(bookingSpecs.previewItems, input);
+}
 
 /** Read-only, called live by the wizard while it is filled in. */
 export async function checkAvailabilityAction(input: unknown) {

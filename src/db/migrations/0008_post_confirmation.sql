@@ -52,9 +52,11 @@ ALTER TABLE "discount_requests" ADD CONSTRAINT "discount_requests_decided_by_use
 CREATE INDEX "booking_changes_booking_idx" ON "booking_changes" USING btree ("booking_id","created_at");--> statement-breakpoint
 CREATE INDEX "discount_requests_booking_idx" ON "discount_requests" USING btree ("booking_id");--> statement-breakpoint
 CREATE INDEX "discount_requests_venue_status_idx" ON "discount_requests" USING btree ("venue_id","status");--> statement-breakpoint
-ALTER TABLE "booking_items" ADD CONSTRAINT "booking_items_change_id_booking_changes_id_fk" FOREIGN KEY ("change_id") REFERENCES "public"."booking_changes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+-- Deferred (hand-edited, D-130): a change's lines are written before its row, which records
+-- the booking after them.
+ALTER TABLE "booking_items" ADD CONSTRAINT "booking_items_change_id_booking_changes_id_fk" FOREIGN KEY ("change_id") REFERENCES "public"."booking_changes"("id") ON DELETE no action ON UPDATE no action DEFERRABLE INITIALLY DEFERRED;--> statement-breakpoint
 ALTER TABLE "booking_items" ADD CONSTRAINT "booking_items_voided_by_users_id_fk" FOREIGN KEY ("voided_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "booking_items" ADD CONSTRAINT "booking_items_voided_change_id_booking_changes_id_fk" FOREIGN KEY ("voided_change_id") REFERENCES "public"."booking_changes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "booking_items" ADD CONSTRAINT "booking_items_voided_change_id_booking_changes_id_fk" FOREIGN KEY ("voided_change_id") REFERENCES "public"."booking_changes"("id") ON DELETE no action ON UPDATE no action DEFERRABLE INITIALLY DEFERRED;--> statement-breakpoint
 ALTER TABLE "booking_items" ADD CONSTRAINT "booking_items_void_check" CHECK (num_nonnulls("booking_items"."voided_at", "booking_items"."voided_by", "booking_items"."voided_change_id") IN (0, 3));--> statement-breakpoint
 -- D-129 (CLAUDE.md rule 4): a discount request is never deleted, and changes once — from
 -- pending to approved, rejected or withdrawn — keeping its amount, reason and requester.

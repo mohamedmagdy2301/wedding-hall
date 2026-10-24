@@ -6,7 +6,16 @@ import { MAX_GUESTS, MAX_QUOTE_ITEMS } from "@/domain/pricing";
 import { addDays } from "@/lib/time";
 import { mobileField, nullableText, optionalMobileField } from "@/modules/customers/schemas";
 import { depositSchema, scheduleSchema } from "@/modules/payments/schemas";
-import { dateField, id, intField, listName, optionalIntField, timeField } from "@/modules/shared/fields";
+import { creditSchema } from "@/modules/discounts/schemas";
+import {
+  dateField,
+  id,
+  intField,
+  listName,
+  nonNegativePoundsField,
+  optionalIntField,
+  timeField,
+} from "@/modules/shared/fields";
 
 // API.md "Bookings" and "Availability" (D-99, D-101, D-106).
 
@@ -127,3 +136,47 @@ export const calendarSchema = z
     message: "calendarRangeInvalid",
   });
 export type CalendarInput = z.output<typeof calendarSchema>;
+
+/** A price typed by hand (Q7-05): pounds → piasters, zero allowed; empty = the current price. */
+const typedPrice = z
+  .union([z.literal(""), z.null(), nonNegativePoundsField])
+  .optional()
+  .transform((v) => (typeof v === "number" ? v : null));
+
+/** What changes on a confirmed booking (BR-40..43, D-128). */
+export const amendChangesSchema = z.object({
+  guests: intField(1, MAX_GUESTS),
+  extraGuestUnitPrice: typedPrice,
+  guestServicePrices: z
+    .array(z.object({ serviceId: id, unitPrice: nonNegativePoundsField }))
+    .max(MAX_QUOTE_ITEMS, "tooMany")
+    .default([]),
+  add: z
+    .array(addedItem.extend({ unitPrice: typedPrice }))
+    .max(MAX_QUOTE_ITEMS, "tooMany")
+    .default([]),
+  remove: z.array(id).max(MAX_QUOTE_ITEMS, "tooMany").default([]),
+  quantities: z
+    .array(z.object({ serviceId: id, quantity: intField(1, MAX_ITEM_QUANTITY), unitPrice: typedPrice }))
+    .max(MAX_QUOTE_ITEMS, "tooMany")
+    .default([]),
+  removeIncluded: z.array(id).max(MAX_QUOTE_ITEMS, "tooMany").default([]),
+  restoreIncluded: z.array(id).max(MAX_QUOTE_ITEMS, "tooMany").default([]),
+});
+export type AmendChanges = z.output<typeof amendChangesSchema>;
+
+export const previewItemsSchema = z.object({ bookingId: id, changes: amendChangesSchema });
+export type PreviewItemsInput = z.output<typeof previewItemsSchema>;
+
+export const updateItemsSchema = z.object({
+  bookingId: id,
+  version,
+  /** The total after the change as previewed, in piasters (like D-124). */
+  expectedTotal: intField(0, MAX_PIASTERS),
+  changes: amendChangesSchema,
+  /** Required when a price typed below the current one asks a discount (BR-41). */
+  overrideReason: nullableText(300),
+  installments: scheduleSchema.optional(),
+  credit: creditSchema,
+});
+export type UpdateItemsInput = z.output<typeof updateItemsSchema>;

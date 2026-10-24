@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, inArray, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm";
 import {
   auditLogs,
   bookingItems,
@@ -25,7 +25,7 @@ import type { DbOrTx } from "@/modules/shared/db";
 import { forbidden, notFound } from "@/modules/shared/errors";
 import { readSpaces } from "@/modules/spaces/service";
 import { assertAllowed, satisfies } from "@/modules/users-rbac/authorize";
-import { displayStatusCondition, findOverlapping, overlapsConfirmedSql } from "./repository";
+import { displayStatusCondition, findOverlapping, overlapsConfirmedSql, requestedQuantity } from "./repository";
 import type { BookingListFilters } from "./schemas";
 
 /** Reads for the booking screens (S-05, S-06, S-07). Statuses are computed at read time (ADR-007). */
@@ -185,7 +185,7 @@ export async function getBooking(db: DbOrTx, actor: SessionUser, bookingId: stri
         lineTotal: bookingItems.lineTotal,
       })
       .from(bookingItems)
-      .where(eq(bookingItems.bookingId, row.id))
+      .where(and(eq(bookingItems.bookingId, row.id), isNull(bookingItems.voidedAt)))
       .orderBy(asc(bookingItems.sortOrder)),
     findOverlapping(
       db,
@@ -216,6 +216,8 @@ export async function getBooking(db: DbOrTx, actor: SessionUser, bookingId: stri
             and(eq(auditLogs.entityType, "booking"), eq(auditLogs.entityId, row.id)),
             // Its payments (D-108): their audit rows carry the booking in `meta`.
             and(eq(auditLogs.entityType, "payment"), sql`${auditLogs.meta}->>'bookingId' = ${row.id}`),
+            // And its discount requests (D-129).
+            and(eq(auditLogs.entityType, "discount_request"), sql`${auditLogs.meta}->>'bookingId' = ${row.id}`),
           ),
         ),
       )
@@ -371,6 +373,7 @@ export async function getTentativeForEdit(db: DbOrTx, actor: SessionUser, bookin
     .select({
       serviceId: bookingItems.serviceId,
       quantity: bookingItems.quantity,
+      pricingType: bookingItems.pricingType,
       source: bookingItems.source,
       isRemoved: bookingItems.isRemoved,
       isExternal: bookingItems.isExternal,
@@ -385,7 +388,7 @@ export async function getTentativeForEdit(db: DbOrTx, actor: SessionUser, bookin
     endTime: cairoTimeOfDay(row.endsAt),
     items: lines
       .filter((l) => l.source === "added" && l.serviceId)
-      .map((l) => ({ serviceId: l.serviceId!, quantity: l.quantity, isExternal: l.isExternal })),
+      .map((l) => ({ serviceId: l.serviceId!, quantity: requestedQuantity(l), isExternal: l.isExternal })),
     removedServiceIds: lines.filter((l) => l.isRemoved && l.serviceId).map((l) => l.serviceId!),
   };
 }

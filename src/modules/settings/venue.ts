@@ -90,8 +90,11 @@ export async function allSpaceSlots(
  * caller that already checked its own permission.
  */
 export async function readVenuePolicies(db: DbOrTx, venueId: string) {
-  const { minDepositType, minDepositValue, cancellationBasis, tiers } = await readSettings(db, venueId);
-  return { minDepositType, minDepositValue, cancellationBasis, tiers };
+  const { minDepositType, minDepositValue, cancellationBasis, postponeCreditMode, tiers } = await readSettings(
+    db,
+    venueId,
+  );
+  return { minDepositType, minDepositValue, cancellationBasis, postponeCreditMode, tiers };
 }
 
 /** The buffer and hold for screens of other permissions (spaces need the buffer, `catalog.manage`). */

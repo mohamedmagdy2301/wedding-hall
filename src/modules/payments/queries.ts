@@ -9,6 +9,7 @@ import type { DbOrTx } from "@/modules/shared/db";
 import { notFound } from "@/modules/shared/errors";
 import { readVenuePolicies } from "@/modules/settings/venue";
 import { assertAllowed, satisfies } from "@/modules/users-rbac/authorize";
+import { totalAsOf } from "@/modules/bookings/changes";
 import { readLedgerRows, readSchedule } from "./repository";
 import type { CollectionsFilters } from "./schemas";
 
@@ -105,7 +106,8 @@ export async function getReceipt(db: DbOrTx, actor: SessionUser, paymentId: stri
     .where(and(eq(payments.id, paymentId), eq(payments.venueId, actor.venueId)));
   if (!row) throw notFound("paymentNotFound");
   const paid = paidAsOfReceipt(await readLedgerRows(db, row.bookingId), row.receiptNo);
-  const total = row.total ?? 0;
+  // D-122: the total as of the receipt too, not the one after later changes.
+  const total = await totalAsOf(db, row.id, row.bookingId, row.total ?? 0);
   return { ...row, eventDate: cairoDate(row.startsAt), total, paid, remaining: total - paid };
 }
 

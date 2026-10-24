@@ -34,6 +34,7 @@ export async function lockBookingForPayment(tx: Tx, venueId: string, bookingId: 
       status: bookings.status,
       total: bookings.total,
       startsAt: bookings.startsAt,
+      endsAt: bookings.endsAt,
       version: bookings.version,
     })
     .from(bookings)

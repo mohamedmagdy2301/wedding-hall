@@ -15,6 +15,8 @@ import type { Tx } from "@/modules/shared/db";
 import { AppError, notFound, ruleViolation } from "@/modules/shared/errors";
 import { runTransaction } from "@/modules/shared/transaction";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
+import { approvedDiscount } from "./changes";
+import { requestedQuantity } from "./repository";
 import { markConfirmed, queueOnSpace } from "./confirm-transition";
 import type { BookingInput } from "./schemas";
 import {
@@ -58,6 +60,7 @@ async function storedItems(tx: Tx, bookingId: string) {
     .select({
       serviceId: bookingItems.serviceId,
       quantity: bookingItems.quantity,
+      pricingType: bookingItems.pricingType,
       source: bookingItems.source,
       isRemoved: bookingItems.isRemoved,
       isExternal: bookingItems.isExternal,
@@ -68,7 +71,7 @@ async function storedItems(tx: Tx, bookingId: string) {
   return {
     items: lines
       .filter((l) => l.source === "added" && l.serviceId)
-      .map((l) => ({ serviceId: l.serviceId!, quantity: l.quantity, isExternal: l.isExternal })),
+      .map((l) => ({ serviceId: l.serviceId!, quantity: requestedQuantity(l), isExternal: l.isExternal })),
     removedServiceIds: lines.filter((l) => l.isRemoved && l.serviceId).map((l) => l.serviceId!),
   };
 }
@@ -127,7 +130,8 @@ async function confirmInTx(tx: Tx, deps: ServiceDeps, actor: SessionUser, input:
     eventDate: cairoDate(current.startsAt),
     guests: current.guests!,
     ...(await storedItems(tx, current.id)),
-    discountAmount: 0,
+    // Q7-01: approved discounts stay; BR-52 refuses the confirmation if they no longer fit.
+    discountAmount: await approvedDiscount(tx, current.id),
   });
   if (price.total !== input.expectedTotal) {
     throw new AppError("PRICE_CHANGED", "priceChanged", {

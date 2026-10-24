@@ -4,13 +4,14 @@ import {
   paymentIdSchema,
   recordDepositSchema,
   recordPaymentSchema,
+  refundSchema,
   setInstallmentsSchema,
   voidPaymentSchema,
 } from "@/modules/payments/schemas";
-import { recordDeposit, recordPayment, setInstallments, voidPayment } from "@/modules/payments/service";
+import { recordDeposit, recordPayment, refundCredit, setInstallments, voidPayment } from "@/modules/payments/service";
 import { defineProtected } from "./define";
 
-/** API.md "Payments" (phase 6, D-118..D-126). `payments.refund` comes with phases 7/8. */
+/** API.md "Payments" (phases 6 and 7, D-118..D-126, D-131). */
 export const paymentSpecs = {
   record: defineProtected({
     schema: recordPaymentSchema,
@@ -26,6 +27,11 @@ export const paymentSpecs = {
     schema: voidPaymentSchema,
     requires: "payments.void",
     handler: (ctx, input) => voidPayment(ctx, ctx.actor, input),
+  }),
+  refund: defineProtected({
+    schema: refundSchema,
+    requires: "payments.refund",
+    handler: (ctx, input) => refundCredit(ctx, ctx.actor, input),
   }),
   setInstallments: defineProtected({
     schema: setInstallmentsSchema,
