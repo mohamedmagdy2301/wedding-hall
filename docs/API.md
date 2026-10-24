@@ -51,23 +51,25 @@ CRUD لـ `spaces` (مع `slots`، و `spaces.upcomingBookings(spaceId)` لتح�
 | `bookings.createConfirmed(…حقول createTentative, expectedTotal, deposit{amount, methodId, paidAt?}, installments[])` | create + confirm + payments.record (D-123) | BR-23؛ يرجع رقم الحجز ورقم الإيصال |
 | `bookings.confirm(id, version, expectedTotal, deposit{amount, methodId, paidAt?}, installments[])` | confirm + payments.record (+ `payments.backdate` مع `paidAt`) | BR-21/22؛ إعادة التسعير، و `PRICE_CHANGED` إن اختلف الإجمالي (D-124)؛ والانتقال للحالة المؤكدة عبر `markConfirmed` فقط (D-97) |
 | `bookings.updateDetails(id, version, eventTypeId, groomName, brideName, notes, customerId)` | edit | بيانات غير مالية لأي حجز غير ملغي |
-| `bookings.updateItems(id, version, changes, installments?, creditResolution?)` | edit | BR-40..43؛ يشمل تغيير عدد المعازيم (D-35)، وإعادة ضبط الأقساط إن تغيّر الإجمالي (D-34) |
+| `bookings.previewItems(id, changes)` | edit | قراءة بس: الإجمالي قبل/بعد والسطور والخصم الناتج عن السعر اليدوي والرصيد والجدول بعد الضبط (D-132) |
+| `bookings.updateItems(id, version, expectedTotal, changes{guests, extraGuestUnitPrice?, guestServicePrices[], add[], remove[], quantities[], removeIncluded[], restoreIncluded[]}, overrideReason?, installments?, credit?{resolution, methodId?})` | edit (+ `payments.refund` مع الاسترداد) | BR-40..43، D-92، D-93، D-128؛ `PRICE_CHANGED` لو الأسعار اتغيرت من المعاينة؛ الأقساط تتظبط (D-34، D-121) والرصيد يتسوى (D-131) |
 | `bookings.postpone(id, version, newDate, slotKind, times, creditResolution?)` | postpone | BR-80..85 |
 | `bookings.cancelPreview(id)` | cancel | الأيام، الشريحة، الأساس، المقترح |
 | `bookings.cancel(id, version, refundAmount, methodId?, reason)` | cancel (+ payments.refund إن وُجد استرداد) | BR-70..76؛ `methodId` مطلوب إن كان `refundAmount > 0` (D-47) |
 | `bookings.get`, `bookings.list(filters)` | view | |
 
 ## Discounts
-`discounts.request(bookingId, amount, reason)` — request
-`discounts.decide(requestId, approve, note?)` — approve
-`discounts.listPending` — approve
+`discounts.request(bookingId, amount, reason, credit?)` — request؛ معتمد على طول لصاحب approve (BR-51)
+`discounts.decide(requestId, approve, note?, credit?)` — approve؛ BR-52 وقت الموافقة، والرصيد حسب D-131
+`discounts.withdraw(requestId)` — صاحب الطلب أو approve (Q7-03)
+`discounts.listPending` — approve (S-10)
 
 ## Payments
 `payments.record(bookingId, amount, methodId, paidAt?, note?)` — record (+ `payments.backdate` مع `paidAt` — D-118)؛ النوع يحدده السيرفر (D-126)، ويرجع رقم الإيصال
 `payments.recordDeposit(bookingId, amount, methodId, paidAt?, note?, installments?)` — record؛ عربون بديل بعد إلغاء العربون (D-40)، والجدول يُضبط إن لم يُرسل (D-121)
 `payments.void(paymentId, reason)` — void
 `payments.receipt(paymentId)` — `bookings.view`؛ بيانات الطباعة وقت الإصدار (D-122)
-`payments.refund(bookingId, amount, methodId, reason)` — refund (المرحلتان 7/8 — D-126)
+`payments.refund(bookingId, amount, methodId, reason)` — refund؛ حتى رصيد العميل، وتحت سياسة `services` بعد نهاية الحفلة (D-131)
 `installments.set(bookingId, version, installments[{dueDate, amount}])` — record
 `collections.list(from, to)` — record (D-123)
 

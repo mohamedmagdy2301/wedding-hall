@@ -157,10 +157,14 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 `unit_price` = ما تحاسب عليه القاعة للوحدة، فهو 0 للمضمن وللخارجي (D-84، D-91). `quantity` للبند بالفرد = عدد المعازيم الذي يغطيه وقت تسعيره (D-84). `bookings.items_total` = Σ `line_total` للبنود غير المضمنة، شاملًا رسوم الخارجي (D-85).
 
 ### discount_requests
-`id, venue_id, booking_id, amount bigint, reason, status enum(pending, approved, rejected), requested_by, decided_by null, decided_at null`
+`id, venue_id, booking_id, amount bigint, reason, source enum(request, price_override), status enum(pending, approved, rejected, withdrawn), requested_by, decided_by null, decided_at null, decision_note null`
+المبلغ > 0، والسبب 3–300 حرف، و `decided_*` موجودة مع أي حالة غير `pending`. trigger يمنع الحذف وأي تعديل غير قرار الطلب المعلق مرة واحدة (D-129). `bookings.discount_amount` = مجموع المعتمد.
 
 ### booking_changes
-`id, venue_id, booking_id, kind enum(postpone, items, guests, price_override, discount), before jsonb, after jsonb, total_before, total_after, credit_resolution enum(refund, services) null, created_by`
+`id, venue_id, booking_id, kind enum(postpone, items, guests, price_override, discount), before jsonb, after jsonb, total_before, total_after, credit_resolution enum(refund, services) null, created_by, created_at`
+append-only بـ trigger (D-130).
+
+`booking_items` بعد التأكيد (D-128): `change_id` (التغيير اللي ضاف السطر)، و `voided_at, voided_by, voided_change_id` (كلهم أو ولا حاجة) للسطر اللي اتشال، ومفيش تعديل في سطر ملغي.
 
 ### booking_documents
 `id, venue_id, booking_id, kind enum(national_id, signed_contract, other), file_key, mime_type, size_bytes, uploaded_by`
