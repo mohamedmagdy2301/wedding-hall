@@ -1,6 +1,8 @@
 import { addDays, cairoDate } from "../src/lib/time";
 import type { SessionUser } from "../src/modules/auth/sessions";
+import { previewItems, updateItems } from "../src/modules/bookings/amend";
 import { confirmBooking } from "../src/modules/bookings/confirm";
+import { insertDiscount } from "../src/modules/discounts/service";
 import { createTentative } from "../src/modules/bookings/service";
 import { createService, type ServiceInput } from "../src/modules/catalog/services";
 import { createPackage, type PackageFields } from "../src/modules/packages/service";
@@ -103,10 +105,11 @@ async function seedDemoConfirmed(
       deposit: { amount: deposit, methodId: method.id, paidAt: null },
       installments: schedule(total, deposit),
     });
+    return { id: tentative.id, bookingNo: tentative.bookingNo };
   };
 
   // Its first installment fell due three days ago: overdue in collections (BR-66).
-  await confirmed(
+  const silver = await confirmed(
     {
       spaceId: spaces.big,
       eventDate: addDays(today, 45),
@@ -124,7 +127,7 @@ async function seedDemoConfirmed(
       ];
     },
   );
-  await confirmed(
+  const engagement = await confirmed(
     {
       spaceId: spaces.small,
       eventDate: addDays(today, 60),
@@ -135,6 +138,36 @@ async function seedDemoConfirmed(
     { name: "منة الله سمير", phone: "01117778899" },
     { groomName: null, brideName: null, eventType: "خطوبة" },
     () => [],
+  );
+
+  // Phase 7 (P7-08): 20 guests added after confirmation (D-92), and a pending discount for S-10.
+  const changes = {
+    guests: 320,
+    extraGuestUnitPrice: null,
+    guestServicePrices: [],
+    add: [],
+    remove: [],
+    quantities: [],
+    removeIncluded: [],
+    restoreIncluded: [],
+  };
+  const preview = await previewItems(deps.db, owner, { bookingId: silver.id, changes });
+  await updateItems(deps, owner, {
+    bookingId: silver.id,
+    version: preview.version,
+    expectedTotal: preview.totalAfter,
+    changes,
+    overrideReason: null,
+    credit: null,
+  });
+  await deps.db.transaction((tx) =>
+    insertDiscount(tx, owner, deps.now, engagement, {
+      bookingId: engagement.id,
+      amount: 100_000,
+      reason: "عميل قديم (تجريبي)",
+      source: "request",
+      approved: false,
+    }),
   );
 }
 
