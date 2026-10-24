@@ -20,7 +20,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { minimumDeposit } from "@/domain/deposit";
 import { rebalanceSchedule, type InstallmentState } from "@/domain/installments";
-import { formatPiasters, parsePounds } from "@/domain/money";
+import { formatPiasters, parsePounds, piastersToInput } from "@/domain/money";
 import type { PaymentKind } from "@/domain/payments";
 import { fill, t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ import type { PaymentFormOptions } from "@/modules/payments/queries";
 import {
   recordDepositAction,
   recordPaymentAction,
+  refundCreditAction,
   setInstallmentsAction,
   voidPaymentAction,
 } from "@/server/actions/payments";
@@ -70,13 +71,19 @@ export function PaymentsPanel(props: {
   money: PaymentsData;
   options: PaymentFormOptions | null;
   canVoid: boolean;
+  /** BR-83, D-131: who may pay back a customer's credit, and whether the policy allows it now. */
+  refund?: {
+    methods: { id: string; name: string }[];
+    creditMode: "refund" | "services" | "both";
+    ended: boolean;
+  } | null;
 }) {
   const router = useRouter();
   const { booking, money, options } = props;
   const open = booking.status === "confirmed";
   const canRecord = options !== null && open;
   const [dialog, setDialog] = useState<
-    null | "record" | "deposit" | "schedule" | { void: PaymentsData["payments"][number] }
+    null | "record" | "deposit" | "schedule" | "refund" | { void: PaymentsData["payments"][number] }
   >(null);
   const close = () => setDialog(null);
   const done = () => {
@@ -107,6 +114,20 @@ export function PaymentsPanel(props: {
             {canRecord && (
               <Button size="sm" variant="outline" onClick={() => setDialog("deposit")} data-testid="record-deposit">
                 {tp.recordDeposit}
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {open && money.ledger.remaining < 0 && (
+        <Alert data-testid="customer-credit">
+          <AlertTriangle />
+          <AlertDescription className="flex flex-wrap items-center gap-2">
+            {fill(tp.creditOnBooking, { amount: formatPiasters(-money.ledger.remaining) })}
+            {props.refund && (props.refund.creditMode !== "services" || props.refund.ended) && (
+              <Button size="sm" variant="outline" onClick={() => setDialog("refund")} data-testid="refund-credit">
+                {tp.refund}
               </Button>
             )}
           </AlertDescription>
@@ -247,6 +268,15 @@ export function PaymentsPanel(props: {
         <RecordDepositDialog booking={booking} money={money} options={options} onClose={close} onDone={done} />
       )}
       {dialog === "schedule" && <ScheduleDialog booking={booking} money={money} onClose={close} onDone={done} />}
+      {dialog === "refund" && props.refund && (
+        <RefundDialog
+          booking={booking}
+          credit={-money.ledger.remaining}
+          methods={props.refund.methods}
+          onClose={close}
+          onDone={done}
+        />
+      )}
       {dialog !== null && typeof dialog === "object" && (
         <VoidDialog payment={dialog.void} onClose={close} onDone={done} />
       )}
@@ -256,7 +286,7 @@ export function PaymentsPanel(props: {
 
 type DialogProps = { onClose: () => void; onDone: () => void };
 
-function DialogShell(props: {
+export function DialogShell(props: {
   title: string;
   description?: React.ReactNode;
   children: React.ReactNode;
@@ -532,6 +562,56 @@ function VoidDialog(props: DialogProps & { payment: { id: string; receiptNo: str
         error={action.error?.fieldErrors?.reason}
         maxLength={300}
         data-testid="void-reason"
+      />
+      <FormError error={action.error} />
+    </DialogShell>
+  );
+}
+
+/** BR-83, D-131: a customer's credit paid back, up to all of it, with its reason. */
+function RefundDialog(
+  props: DialogProps & {
+    booking: { id: string; bookingNo: string };
+    credit: number;
+    methods: { id: string; name: string }[];
+  },
+) {
+  const action = useServerAction(refundCreditAction);
+  const [amount, setAmount] = useState(piastersToInput(props.credit));
+  const [methodId, setMethodId] = useState(props.methods[0]?.id ?? "");
+  const [reason, setReason] = useState("");
+  const errors = action.error?.fieldErrors ?? {};
+  return (
+    <DialogShell
+      testId="refund-dialog"
+      title={fill(tp.refundTitle, { no: props.booking.bookingNo })}
+      description={fill(tp.creditOnBooking, { amount: formatPiasters(props.credit) })}
+      onClose={props.onClose}
+      footer={
+        <Button
+          disabled={action.pending || !methodId}
+          data-testid="refund-submit"
+          onClick={() => action.run({ bookingId: props.booking.id, amount, methodId, reason }, props.onDone)}
+        >
+          {action.pending ? t.common.saving : tp.refund}
+        </Button>
+      }
+    >
+      <Field
+        label={tp.amount}
+        inputMode="decimal"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        error={errors.amount}
+      />
+      <MethodSelect methods={props.methods} value={methodId} onChange={setMethodId} error={errors.methodId} />
+      <Field
+        label={tp.refundReason}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        error={errors.reason}
+        maxLength={300}
+        data-testid="refund-reason"
       />
       <FormError error={action.error} />
     </DialogShell>

@@ -200,3 +200,12 @@ export async function getPaymentFormOptions(db: DbOrTx, actor: SessionUser) {
 }
 
 export type PaymentFormOptions = Awaited<ReturnType<typeof getPaymentFormOptions>>;
+
+/** The venue's active payment methods, for refunding a credit (BR-83) from screens of other permissions. */
+export async function activePaymentMethods(db: DbOrTx, venueId: string) {
+  return db
+    .select({ id: paymentMethods.id, name: paymentMethods.name })
+    .from(paymentMethods)
+    .where(and(eq(paymentMethods.venueId, venueId), eq(paymentMethods.isActive, true)))
+    .orderBy(asc(paymentMethods.sortOrder), asc(paymentMethods.name));
+}

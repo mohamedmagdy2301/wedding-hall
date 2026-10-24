@@ -16,7 +16,9 @@ import type { BookingListFilters, CalendarInput } from "@/modules/bookings/schem
 import { listServices } from "@/modules/catalog/services";
 import { getCustomer, listCustomers } from "@/modules/customers/service";
 import { getNewPackageOptions, getPackage, listPackages } from "@/modules/packages/service";
-import { getPaymentFormOptions, getReceipt, listCollections } from "@/modules/payments/queries";
+import { activePaymentMethods, getPaymentFormOptions, getReceipt, listCollections } from "@/modules/payments/queries";
+import { getAmendOptions } from "@/modules/bookings/amend";
+import { bookingDiscounts, listPendingDiscounts } from "@/modules/discounts/queries";
 import type { CollectionsFilters } from "@/modules/payments/schemas";
 import { resolveSession, type SessionUser } from "@/modules/auth/sessions";
 import { getSetupChecklist } from "@/modules/settings/checklist";
@@ -24,7 +26,7 @@ import { listItems } from "@/modules/settings/lists";
 import { getVenueSummary } from "@/modules/settings/repository";
 import type { ListKind } from "@/modules/settings/schemas";
 import { listSeasons } from "@/modules/settings/seasons";
-import { getTiming, getVenueSettings } from "@/modules/settings/venue";
+import { getTiming, getVenueSettings, readVenuePolicies } from "@/modules/settings/venue";
 import { listSpaces } from "@/modules/spaces/service";
 import { satisfies, type Requirement } from "@/modules/users-rbac/authorize";
 import { listRoles } from "@/modules/users-rbac/roles";
@@ -203,18 +205,46 @@ export async function getBookingPageData(bookingId: string) {
   const db = getDb();
   const data = await orNotFound(bookingId, () => getBooking(db, actor, bookingId, new Date()));
   const canRecord = satisfies(actor, "payments.record");
-  const [timing, paymentOptions] = await Promise.all([
+  const canEdit = satisfies(actor, "bookings.edit");
+  const { booking } = data;
+  const amendable = canEdit && booking.status === "confirmed" && booking.packageId !== null;
+  const [timing, paymentOptions, discounts, policies, methods, amendOptions] = await Promise.all([
     getTiming(db, actor.venueId),
     canRecord ? getPaymentFormOptions(db, actor) : null,
+    bookingDiscounts(db, actor.venueId, booking.id),
+    readVenuePolicies(db, actor.venueId),
+    activePaymentMethods(db, actor.venueId),
+    amendable ? getAmendOptions(db, actor, booking.packageId!) : null,
   ]);
   return {
     ...data,
-    canEdit: satisfies(actor, "bookings.edit"),
+    canEdit,
     canConfirm: satisfies(actor, "bookings.confirm") && canRecord,
     canVoid: satisfies(actor, "payments.void"),
     paymentOptions,
     holdHours: timing.tentativeHoldHours,
+    // Phase 7 (BR-40..43, BR-50..52, BR-83).
+    discounts,
+    canRequestDiscount: satisfies(actor, "discounts.request"),
+    canApproveDiscount: satisfies(actor, "discounts.approve"),
+    canRefund: satisfies(actor, "payments.refund"),
+    userId: actor.userId,
+    creditMode: policies.postponeCreditMode,
+    methods,
+    amendOptions,
   };
+}
+
+/** S-10 (`discounts.approve`): pending requests, with what approving each would leave. */
+export async function getApprovalsPageData() {
+  const actor = await requireAccess("discounts.approve");
+  const db = getDb();
+  const [rows, policies, methods] = await Promise.all([
+    listPendingDiscounts(db, actor),
+    readVenuePolicies(db, actor.venueId),
+    activePaymentMethods(db, actor.venueId),
+  ]);
+  return { rows, creditMode: policies.postponeCreditMode, methods };
 }
 
 /** S-05 (`bookings.view`). */

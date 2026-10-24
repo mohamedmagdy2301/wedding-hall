@@ -381,3 +381,21 @@ async function writeAmendment(
     })),
   );
 }
+
+/** What the amend dialog chooses from (`bookings.edit`): active services to add, and which included ones may come off now. */
+export async function getAmendOptions(db: DbOrTx, actor: SessionUser, packageId: string) {
+  assertAllowed(actor, "bookings.edit");
+  const [all, included] = await Promise.all([
+    readServices(db, actor.venueId),
+    db
+      .select({ serviceId: packageItems.serviceId, removable: packageItems.removable })
+      .from(packageItems)
+      .where(and(eq(packageItems.packageId, packageId), eq(packageItems.venueId, actor.venueId))),
+  ]);
+  return {
+    services: all
+      .filter((s) => s.isActive)
+      .map((s) => ({ id: s.id, name: s.name, pricingType: s.pricingType, allowExternal: s.allowExternal })),
+    removable: included.filter((i) => i.removable).map((i) => i.serviceId),
+  };
+}

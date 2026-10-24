@@ -19,6 +19,9 @@ import { ConfirmDepositDialog } from "@/components/payments/confirm-deposit-dial
 import { PaymentsPanel, type PaymentsData } from "@/components/payments/payments-panel";
 import type { PaymentFormOptions } from "@/modules/payments/queries";
 import { confirmBookingAction, extendTentativeAction } from "@/server/actions/bookings";
+import type { CreditMode } from "@/components/discounts/credit-choice";
+import { DiscountsSection, type DiscountRow } from "@/components/discounts/discounts-section";
+import { AmendDialog, type AmendLine, type AmendOptions } from "./amend-dialog";
 import { PriceBreakdownView, type BreakdownView } from "./price-breakdown";
 import { StatusBadge } from "./status-badge";
 
@@ -26,7 +29,7 @@ const tp = t.bookings.page;
 const auditActions: Record<string, string> = t.audit.actions;
 const fieldLabels: Record<string, string> = tp.fields;
 
-type Line = BreakdownView["lines"][number] & { externalFee: number };
+type Line = BreakdownView["lines"][number] & AmendLine & { externalFee: number };
 
 export type BookingViewData = {
   booking: {
@@ -78,6 +81,14 @@ export type BookingViewData = {
   canVoid: boolean;
   paymentOptions: PaymentFormOptions | null;
   holdHours: number;
+  discounts: DiscountRow[];
+  canRequestDiscount: boolean;
+  canApproveDiscount: boolean;
+  canRefund: boolean;
+  userId: string;
+  creditMode: CreditMode;
+  methods: { id: string; name: string }[];
+  amendOptions: AmendOptions | null;
 };
 
 function show(field: string, value: unknown): string {
@@ -95,6 +106,7 @@ export function BookingView({ data }: { data: BookingViewData }) {
   const { booking: b } = data;
   const [extending, setExtending] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [amending, setAmending] = useState(false);
   const extend = useServerAction(extendTentativeAction);
   const isTentative = b.status === "tentative";
 
@@ -104,7 +116,13 @@ export function BookingView({ data }: { data: BookingViewData }) {
       : {
           basePrice: b.basePrice ?? 0,
           seasonal: b.seasonName !== null,
-          extraGuests: b.guests !== null && b.baseGuests !== null ? Math.max(0, b.guests - b.baseGuests) : 0,
+          // The snapshot's extra guests (BR-37); guests added after confirmation are lines (D-92).
+          extraGuests:
+            b.extraGuestPrice && b.extraGuestsAmount
+              ? Math.round(b.extraGuestsAmount / b.extraGuestPrice)
+              : b.guests !== null && b.baseGuests !== null && !b.extraGuestPrice
+                ? Math.max(0, b.guests - b.baseGuests)
+                : 0,
           extraGuestPrice: b.extraGuestPrice ?? 0,
           extraGuestsAmount: b.extraGuestsAmount ?? 0,
           lines: data.lines,
@@ -130,6 +148,11 @@ export function BookingView({ data }: { data: BookingViewData }) {
           {isTentative && data.canConfirm && data.paymentOptions && (
             <Button onClick={() => setConfirming(true)} data-testid="confirm-booking">
               {tp.confirm}
+            </Button>
+          )}
+          {b.status === "confirmed" && data.amendOptions && (
+            <Button variant="outline" onClick={() => setAmending(true)} data-testid="amend-booking">
+              {tp.amend}
             </Button>
           )}
           {isTentative && data.canEdit && (
@@ -246,6 +269,22 @@ export function BookingView({ data }: { data: BookingViewData }) {
               )}
             </CardContent>
           </Card>
+          <Card className="mt-4 py-4">
+            <CardContent className="px-4">
+              <DiscountsSection
+                booking={{ id: b.id, bookingNo: b.bookingNo, status: b.status, total: b.total }}
+                discounts={data.discounts}
+                canRequest={data.canRequestDiscount}
+                canApprove={data.canApproveDiscount}
+                userId={data.userId}
+                credit={{
+                  paid: b.status === "confirmed" ? data.money.ledger.paid : 0,
+                  mode: data.creditMode,
+                  methods: data.methods,
+                }}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="payments">
           <PaymentsPanel
@@ -253,6 +292,11 @@ export function BookingView({ data }: { data: BookingViewData }) {
             money={data.money}
             options={data.paymentOptions}
             canVoid={data.canVoid}
+            refund={
+              data.canRefund
+                ? { methods: data.methods, creditMode: data.creditMode, ended: b.endsAt < new Date() }
+                : null
+            }
           />
         </TabsContent>
         <TabsContent value="history">
@@ -285,6 +329,20 @@ export function BookingView({ data }: { data: BookingViewData }) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {amending && data.amendOptions && b.guests !== null && (
+        <AmendDialog
+          booking={{ id: b.id, bookingNo: b.bookingNo, version: b.version, guests: b.guests }}
+          lines={data.lines}
+          options={data.amendOptions}
+          credit={{ mode: data.creditMode, methods: data.methods }}
+          onClose={() => setAmending(false)}
+          onDone={() => {
+            setAmending(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       {confirming && data.paymentOptions && (
         <ConfirmDepositDialog
