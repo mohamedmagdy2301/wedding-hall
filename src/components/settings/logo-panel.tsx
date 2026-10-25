@@ -20,7 +20,7 @@ export function LogoPanel({ logoUrl }: { logoUrl: string | null }) {
   const upload = useServerAction(setLogoAction);
   const remove = useServerAction(removeLogoAction);
   const [file, setFile] = useState<File | null>(null);
-  const saved = useSavedNote();
+  const saved = useSavedNote("logo-saved");
   const done = () => {
     setFile(null);
     saved.flash();
