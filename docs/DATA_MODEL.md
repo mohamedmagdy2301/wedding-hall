@@ -167,7 +167,8 @@ append-only بـ trigger (D-130). نوع `postpone` قبل/بعد فيه الم�
 `booking_items` بعد التأكيد (D-128): `change_id` (التغيير اللي ضاف السطر)، و `voided_at, voided_by, voided_change_id` (كلهم أو ولا حاجة) للسطر اللي اتشال، ومفيش تعديل في سطر ملغي.
 
 ### booking_documents
-`id, venue_id, booking_id, kind enum(national_id, signed_contract, other), file_key, mime_type, size_bytes, uploaded_by`
+`id, venue_id, booking_id, kind enum(national_id, signed_contract, other), file_key, mime_type, size_bytes, uploaded_by, removed_at, removed_by, remove_reason`
+`file_key` فريد وعشوائي (`venues/<venueId>/documents/<uuid>`)، والنوع من JPEG و PNG و WEBP و PDF، والحجم 1 بايت لـ 5 ميجا. `removed_*` كلهم أو ولا حاجة، والسبب 3–300 حرف. trigger يمنع الحذف وأي تعديل غير الإزالة مرة واحدة (Migration `0010`، D-143)؛ الملف نفسه بيتمسح من R2.
 
 ## 5. المدفوعات
 
@@ -194,6 +195,7 @@ trigger يمنع حذف الدفعات وأي تعديل غير إلغاء دف�
 
 ### expenses
 `id, venue_id, category_id, booking_id null, amount bigint, spent_on date, description, created_by, voided_at, voided_by, void_reason`
+المبلغ > 0، والوصف 3–300 حرف، و `void_*` كلهم أو ولا حاجة. trigger يمنع الحذف وأي تعديل غير الإلغاء مرة واحدة (Migration `0010`، BR-95، D-146). الحجز المرتبط للعرض بس، ومبيغيّرش إجماليه ولا دفتره (Q10-02).
 
 ## 7. المستخدمون والصلاحيات
 

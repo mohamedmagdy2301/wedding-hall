@@ -75,11 +75,20 @@ CRUD لـ `spaces` (مع `slots`، و `spaces.upcomingBookings(spaceId)` لتح�
 `collections.list(from, to)` — record (D-123)
 
 ## Documents
-`documents.upload(bookingId, kind, file)` — upload (حد للحجم والنوع)
-`documents.getViewUrl(documentId)` — `documents.view_id` لنوع البطاقة؛ رابط مؤقت + سجل
+`documents.upload(bookingId, kind, file)` — upload؛ النوع من البايتات وحد 5 ميجا (D-142)، حتى على الحجز الملغي
+`documents.list(bookingId)` — `bookings.view`؛ البطاقة من غير رابط لمن معندوش `documents.view_id`
+`documents.getViewUrl(documentId)` — البطاقة `documents.view_id`، والباقي `bookings.view`؛ رابط موقّع 5 دقايق + سجل لكل فتح (D-143)
+`documents.remove(documentId, reason)` — البطاقة `documents.view_id`، والباقي `documents.upload`؛ السطر يفضل والملف يتمسح (Q9-03)
+`settings.setLogo(file)` / `settings.removeLogo()` — `settings.manage`؛ صورة حتى 1 ميجا (D-144)
 
 ## Expenses
-`expenses.list`, `expenses.create`, `expenses.void(reason)`
+`expenses.list(from, to, categoryId?, bookingId?)` — `expenses.view`
+`expenses.create(categoryId, amount, spentOn, description, bookingNo?)` — `expenses.record`؛ لحد النهارده (Q10-01)، والحجز برقمه (Q10-02)
+`expenses.void(expenseId, reason)` — `expenses.void`؛ مرة واحدة (BR-95)
+`expenses.summary(from, to)` — `reports.financial`؛ صافي التحصيل − المصروفات (D-147)
+
+## Printing
+`/print/bookings/[id]/details` (P-01) و `/print/bookings/[id]/contract` (P-02، المؤكد والملغي) و `/print/receipts/[id]` (P-03، P-04) — `bookings.view`؛ صفحات بتتطبع من المتصفح (D-145)
 
 ## Reports
 `reports.dashboard` — حسب صلاحيات المستخدم
