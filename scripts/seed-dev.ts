@@ -14,6 +14,11 @@ import { setupVenue } from "../src/modules/settings/setup";
 import { updatePolicies, updateVenue } from "../src/modules/settings/venue";
 import type { ServiceDeps } from "../src/modules/shared/context";
 import { createSpace } from "../src/modules/spaces/service";
+import { uploadDocument } from "../src/modules/documents/service";
+import { createExpense, voidExpense } from "../src/modules/expenses/service";
+import { setLogo } from "../src/modules/settings/logo";
+import { ensureLocalBucket, LOCAL_FILE_STORE } from "../src/lib/r2";
+import { demoIdCard, demoLogo, demoPdf } from "./lib/demo-files";
 import { askNewPassword } from "./lib/prompt";
 import { fail, scriptDeps } from "./lib/services";
 
@@ -28,7 +33,10 @@ import { fail, scriptDeps } from "./lib/services";
  * with one number — D-28); phase 6 two confirmed ones with their deposit, one with a
  * schedule whose first installment is overdue (P6-12), through bookings.confirm. Phase 7 a
  * guest change and a pending discount; phase 8 a booking postponed into the summer season and
- * one cancelled with the refund its tiers suggest (P8-10).
+ * one cancelled with the refund its tiers suggest (P8-10); phases 9 and 10 the logo, two
+ * documents and expenses — one on a booking, one on the cancelled booking, one voided (P9-11).
+ * Files go to R2 when it is configured, or to the local stand-in for a local database;
+ * otherwise the logo and documents are skipped.
  */
 async function seedDemoSettings(deps: ServiceDeps, owner: SessionUser) {
   await updateVenue(deps, owner, { name: "قاعة تجريبية", phone: "0221234567", address: "مدينة نصر، القاهرة" });
@@ -225,6 +233,65 @@ async function seedDemoConfirmed(
     methodId: suggested > 0 ? method.id : null,
     adjustReason: null,
   });
+
+  await seedDemoFilesAndExpenses(deps, owner, { moved, dropped, today });
+}
+
+/** Phases 9 and 10 (P9-11). */
+async function seedDemoFilesAndExpenses(
+  deps: ServiceDeps,
+  owner: SessionUser,
+  bookings: { moved: { id: string; bookingNo: string }; dropped: { id: string; bookingNo: string }; today: string },
+) {
+  if (deps.files) {
+    if (process.env.R2_ENDPOINT === undefined) await ensureLocalBucket(LOCAL_FILE_STORE);
+    await setLogo(deps, owner, { file: new Blob([demoLogo()], { type: "image/png" }) });
+    await uploadDocument(deps, owner, {
+      bookingId: bookings.moved.id,
+      kind: "national_id",
+      file: new Blob([demoIdCard()], { type: "image/png" }),
+    });
+    await uploadDocument(deps, owner, {
+      bookingId: bookings.moved.id,
+      kind: "signed_contract",
+      file: new Blob([demoPdf("Signed contract (demo)")], { type: "application/pdf" }),
+    });
+  } else {
+    console.log("No R2 for this database: the demo logo and documents are skipped.");
+  }
+
+  const categories = (await listItems(deps.db, owner, "expenseCategories")).filter((c) => c.isActive);
+  const category = (i: number) => categories[i % categories.length].id;
+  const { today } = bookings;
+  await createExpense(deps, owner, {
+    categoryId: category(0),
+    amount: 250_000,
+    spentOn: today,
+    description: "فرقة إضافية للحفلة (تجريبي)",
+    bookingNo: bookings.moved.bookingNo,
+  });
+  await createExpense(deps, owner, {
+    categoryId: category(1),
+    amount: 50_000,
+    spentOn: addDays(today, -2),
+    description: "تعويض مورد بعد الإلغاء (تجريبي)",
+    bookingNo: bookings.dropped.bookingNo,
+  });
+  await createExpense(deps, owner, {
+    categoryId: category(2),
+    amount: 80_000,
+    spentOn: addDays(today, -5),
+    description: "صيانة التكييف (تجريبي)",
+    bookingNo: null,
+  });
+  const wrong = await createExpense(deps, owner, {
+    categoryId: category(0),
+    amount: 120_000,
+    spentOn: addDays(today, -1),
+    description: "مصروف اتسجل مرتين (تجريبي)",
+    bookingNo: null,
+  });
+  await voidExpense(deps, owner, { expenseId: wrong.id, reason: "اتسجل مرتين" });
 }
 
 /** Tentative bookings through the same service as the wizard, dated from today. */

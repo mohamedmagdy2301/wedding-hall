@@ -1,4 +1,5 @@
 import { createDb, type DbHandle } from "../../src/db/client";
+import { createFileStore, fileStoreConfigFrom, LOCAL_FILE_STORE, type FileStore } from "../../src/lib/r2";
 import { createPasswordHasher } from "../../src/modules/auth/password/hasher";
 import { resolveHashConfig } from "../../src/modules/auth/password/params";
 import { loadArgon2ModuleFromDisk } from "../../src/modules/auth/password/wasm-node";
@@ -14,10 +15,23 @@ import { requireEnv } from "./load-env";
  * parameters in .env.secrets.local (never in a bundled env file — D-65).
  */
 export function scriptDeps(): { deps: ServiceDeps; handle: DbHandle } {
-  const handle = createDb(requireEnv("DATABASE_URL"), { localWsProxy: process.env.NEON_LOCAL_WSPROXY || undefined });
+  const databaseUrl = requireEnv("DATABASE_URL");
+  const handle = createDb(databaseUrl, { localWsProxy: process.env.NEON_LOCAL_WSPROXY || undefined });
   const { params } = resolveHashConfig(process.env);
   const hasher = createPasswordHasher(loadArgon2ModuleFromDisk(), params);
-  return { deps: { db: handle.db, hasher, now: new Date() }, handle };
+  return { deps: { db: handle.db, hasher, now: new Date(), files: scriptFiles(databaseUrl) }, handle };
+}
+
+/**
+ * R2 for scripts (phase 9): the configured bucket, or the local stand-in for a local database
+ * only — files of a Neon database never go to this machine. `null`: no files are written.
+ */
+function scriptFiles(databaseUrl: string): FileStore | null {
+  // Never the development fallback: only an explicit R2 or a local database.
+  const config = fileStoreConfigFrom({ ...process.env, NODE_ENV: undefined });
+  if (config) return createFileStore(config);
+  const host = new URL(databaseUrl).hostname;
+  return host === "localhost" || host === "127.0.0.1" ? createFileStore(LOCAL_FILE_STORE) : null;
 }
 
 /** Prints an error without values that could be secret (SEC-32), then exits non-zero. */

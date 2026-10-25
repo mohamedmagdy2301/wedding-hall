@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { Client } from "pg";
 import { runMigrations } from "../../scripts/migrate";
+import { ensureLocalBucket } from "../../src/lib/r2";
 import { createDb } from "../../src/db/client";
 import { roles, userRoles, users } from "../../src/db/schema";
 import { createPasswordHasher } from "../../src/modules/auth/password/hasher";
@@ -37,6 +38,7 @@ async function prepareE2eDatabase() {
   }
 
   await runMigrations(E2E_DATABASE_URL);
+  await ensureLocalBucket();
 
   const handle = createDb(E2E_DATABASE_URL, { localWsProxy: E2E_WS_PROXY || undefined });
   try {

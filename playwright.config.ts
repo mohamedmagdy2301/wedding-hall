@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { LOCAL_FILE_STORE } from "./src/lib/r2";
 import { E2E_DATABASE_URL, E2E_WS_PROXY } from "./tests/e2e/env";
 
 const PORT = 3100;
@@ -34,6 +35,8 @@ export default defineConfig({
         env: {
           DATABASE_URL: E2E_DATABASE_URL,
           NEON_LOCAL_WSPROXY: E2E_WS_PROXY,
+          // Documents and the logo in the local R2 stand-in (phase 9); local-only keys.
+          ...LOCAL_FILE_STORE,
         },
       },
 });
