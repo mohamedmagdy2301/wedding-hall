@@ -154,6 +154,8 @@ export async function getBooking(db: DbOrTx, actor: SessionUser, bookingId: stri
       discountAmount: bookings.discountAmount,
       total: bookings.total,
       notes: bookings.notes,
+      cancelledAt: bookings.cancelledAt,
+      cancelReason: bookings.cancelReason,
       createdAt: bookings.createdAt,
       createdByName: users.name,
     })

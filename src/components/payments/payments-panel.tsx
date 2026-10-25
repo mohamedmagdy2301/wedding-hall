@@ -93,18 +93,43 @@ export function PaymentsPanel(props: {
 
   return (
     <div className="grid gap-4" data-testid="payments-panel">
-      <div className="grid grid-cols-3 gap-2 text-sm">
-        {(["total", "paid", "remaining"] as const).map((key) => (
-          <Card key={key} className="py-3">
+      {booking.status === "cancelled" ? (
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <Card className="py-3">
             <CardContent className="px-3">
-              <p className="text-muted-foreground">{tp[key]}</p>
-              <p className="font-semibold tabular-nums" data-testid={`ledger-${key}`}>
-                {formatPiasters(money.ledger[key])}
+              <p className="text-muted-foreground">{t.cancel.retainedLabel}</p>
+              <p className="font-semibold tabular-nums" data-testid="ledger-retained">
+                {formatPiasters(money.ledger.paid)}
               </p>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          <Card className="py-3">
+            <CardContent className="px-3">
+              <p className="text-muted-foreground">{t.cancel.refundedLabel}</p>
+              <p className="font-semibold tabular-nums" data-testid="ledger-refunded">
+                {formatPiasters(
+                  money.payments
+                    .filter((pay) => pay.kind === "refund" && !pay.voidedAt)
+                    .reduce((s, pay) => s + pay.amount, 0),
+                )}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          {(["total", "paid", "remaining"] as const).map((key) => (
+            <Card key={key} className="py-3">
+              <CardContent className="px-3">
+                <p className="text-muted-foreground">{tp[key]}</p>
+                <p className="font-semibold tabular-nums" data-testid={`ledger-${key}`}>
+                  {formatPiasters(money.ledger[key])}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {money.depositMissing && (
         <Alert variant="destructive" data-testid="deposit-missing">

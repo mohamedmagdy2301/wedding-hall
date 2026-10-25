@@ -41,7 +41,7 @@ export default async function ReceiptPage({ params, searchParams }: PageProps<"/
     [tr.amount, <strong key="amount">{formatPiasters(r.amount)}</strong>],
     [tr.total, formatPiasters(r.total)],
     [tr.paid, formatPiasters(r.paid)],
-    [tr.remaining, formatPiasters(r.remaining)],
+    [tr.remaining, r.afterCancellation ? tr.bookingCancelled : formatPiasters(r.remaining)],
     [tr.receivedBy, r.receivedByName],
   ];
 

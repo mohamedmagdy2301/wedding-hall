@@ -1,6 +1,16 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { bookings, customers, installments, paymentMethods, payments, spaces, users, venues } from "@/db/schema";
+import {
+  auditLogs,
+  bookings,
+  customers,
+  installments,
+  paymentMethods,
+  payments,
+  spaces,
+  users,
+  venues,
+} from "@/db/schema";
 import { installmentStatuses } from "@/domain/installments";
 import { activeDeposit, ledger, netPaid, paidAsOfReceipt } from "@/domain/payments";
 import { addDays, cairoDate } from "@/lib/time";
@@ -62,7 +72,9 @@ export async function bookingPayments(
   return {
     ledger: money,
     payments: rows,
-    installments: installmentStatuses(total, schedule, money.paid, cairoDate(now)),
+    // A cancelled booking owes nothing (BR-76, D-53): no installments left to collect.
+    installments:
+      booking.status === "cancelled" ? [] : installmentStatuses(total, schedule, money.paid, cairoDate(now)),
     activeDeposit: deposit ? { id: deposit.id, amount: deposit.amount } : null,
     // D-40: confirmed, its deposit voided and no replacement yet.
     depositMissing: booking.status === "confirmed" && !deposit,
@@ -108,7 +120,26 @@ export async function getReceipt(db: DbOrTx, actor: SessionUser, paymentId: stri
   const paid = paidAsOfReceipt(await readLedgerRows(db, row.bookingId), row.receiptNo);
   // D-122: the total as of the receipt too, not the one after later changes.
   const total = await totalAsOf(db, row.id, row.bookingId, row.total ?? 0);
-  return { ...row, eventDate: cairoDate(row.startsAt), total, paid, remaining: total - paid };
+  // D-53: issued by the cancellation (same transaction, same instant) — nothing is owed any more.
+  const [cancellation] = await db
+    .select({ at: auditLogs.createdAt })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.action, "bookings.cancel"),
+        eq(auditLogs.entityId, row.bookingId),
+        sql`${auditLogs.createdAt} <= (SELECT ${payments.createdAt} FROM ${payments} WHERE ${payments.id} = ${row.id})`,
+      ),
+    );
+  const afterCancellation = cancellation !== undefined;
+  return {
+    ...row,
+    eventDate: cairoDate(row.startsAt),
+    total,
+    paid,
+    remaining: afterCancellation ? 0 : total - paid,
+    afterCancellation,
+  };
 }
 
 export type Receipt = Awaited<ReturnType<typeof getReceipt>>;

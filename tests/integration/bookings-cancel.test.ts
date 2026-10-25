@@ -149,8 +149,20 @@ describe("cancellation (BR-70..76)", () => {
       .catch((e: unknown) => e);
     expect(pgErrorCode(error)).toBe("42501");
 
+    // D-53: the cancellation's receipt owes nothing; the deposit's keeps its numbers (D-122).
+    expect(ok(await s.call(paymentSpecs.receipt, { paymentId: result.refund.paymentId }))).toMatchObject({
+      afterCancellation: true,
+      remaining: 0,
+      paid: p("3,750"),
+    });
+    expect(ok(await s.call(paymentSpecs.receipt, { paymentId: a.depositId }))).toMatchObject({
+      afterCancellation: false,
+      remaining: p("45,000"),
+    });
     const page = ok(await s.call(bookingSpecs.get, { bookingId: a.id }));
     expect(page.booking.displayStatus).toBe("cancelled");
+    expect(page.booking.cancelReason).toBe("العريس سافر");
+    expect(page.money.installments).toEqual([]);
     expect(page.money.ledger.paid).toBe(p("3,750"));
     expect(page.history.map((h: { action: string }) => h.action)).toEqual(
       expect.arrayContaining(["bookings.cancel", "payments.record"]),

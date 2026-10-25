@@ -228,6 +228,9 @@ export async function getBookingPageData(bookingId: string) {
     canRequestDiscount: satisfies(actor, "discounts.request"),
     canApproveDiscount: satisfies(actor, "discounts.approve"),
     canRefund: satisfies(actor, "payments.refund"),
+    // Phase 8 (BR-70..85, Q8-05).
+    canPostpone: satisfies(actor, "bookings.postpone"),
+    canCancel: satisfies(actor, "bookings.cancel") || (booking.status === "tentative" && canEdit),
     userId: actor.userId,
     creditMode: policies.postponeCreditMode,
     methods,

@@ -22,6 +22,8 @@ import { confirmBookingAction, extendTentativeAction } from "@/server/actions/bo
 import type { CreditMode } from "@/components/discounts/credit-choice";
 import { DiscountsSection, type DiscountRow } from "@/components/discounts/discounts-section";
 import { AmendDialog, type AmendLine, type AmendOptions } from "./amend-dialog";
+import { CancelDialog } from "./cancel-dialog";
+import { PostponeDialog } from "./postpone-dialog";
 import { PriceBreakdownView, type BreakdownView } from "./price-breakdown";
 import { StatusBadge } from "./status-badge";
 
@@ -61,6 +63,8 @@ export type BookingViewData = {
     discountAmount: number | null;
     total: number | null;
     notes: string | null;
+    cancelledAt: Date | null;
+    cancelReason: string | null;
     createdAt: Date;
     createdByName: string;
     eventDate: string;
@@ -85,6 +89,8 @@ export type BookingViewData = {
   canRequestDiscount: boolean;
   canApproveDiscount: boolean;
   canRefund: boolean;
+  canPostpone: boolean;
+  canCancel: boolean;
   userId: string;
   creditMode: CreditMode;
   methods: { id: string; name: string }[];
@@ -107,8 +113,12 @@ export function BookingView({ data }: { data: BookingViewData }) {
   const [extending, setExtending] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [amending, setAmending] = useState(false);
+  const [postponing, setPostponing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const extend = useServerAction(extendTentativeAction);
   const isTentative = b.status === "tentative";
+  // BR-76, BR-80: a confirmed party that is over is neither postponed nor cancelled.
+  const upcoming = b.status === "confirmed" && b.displayStatus !== "completed";
 
   const breakdown: BreakdownView | null =
     b.total === null
@@ -155,6 +165,16 @@ export function BookingView({ data }: { data: BookingViewData }) {
               {tp.amend}
             </Button>
           )}
+          {upcoming && data.canPostpone && (
+            <Button variant="outline" onClick={() => setPostponing(true)} data-testid="postpone-booking">
+              {tp.postpone}
+            </Button>
+          )}
+          {(isTentative || upcoming) && data.canCancel && (
+            <Button variant="destructive" onClick={() => setCancelling(true)} data-testid="cancel-booking">
+              {tp.cancel}
+            </Button>
+          )}
           {isTentative && data.canEdit && (
             <>
               <Button variant="outline" onClick={() => setExtending(true)} data-testid="extend-booking">
@@ -196,6 +216,14 @@ export function BookingView({ data }: { data: BookingViewData }) {
               {formatPiasters(data.money.ledger.paid)}
               <span className="text-muted-foreground"> — {t.payments.remaining}: </span>
               {formatPiasters(data.money.ledger.remaining)}
+            </p>
+          )}
+          {b.status === "cancelled" && (
+            <p className="sm:col-span-2" data-testid="booking-cancelled">
+              <span className="text-muted-foreground">{tp.cancelledAt}: </span>
+              {b.cancelledAt && formatCairoDateTime(b.cancelledAt)}
+              <span className="text-muted-foreground"> — {tp.cancelReason}: </span>
+              {b.cancelReason}
             </p>
           )}
           {isTentative && b.tentativeExpiresAt && (
@@ -291,7 +319,7 @@ export function BookingView({ data }: { data: BookingViewData }) {
             booking={{ id: b.id, bookingNo: b.bookingNo, version: b.version, status: b.status, eventDate: b.eventDate }}
             money={data.money}
             options={data.paymentOptions}
-            canVoid={data.canVoid}
+            canVoid={data.canVoid && b.status !== "cancelled"}
             refund={
               data.canRefund
                 ? { methods: data.methods, creditMode: data.creditMode, ended: b.endsAt < new Date() }
@@ -339,6 +367,31 @@ export function BookingView({ data }: { data: BookingViewData }) {
           onClose={() => setAmending(false)}
           onDone={() => {
             setAmending(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {postponing && (
+        <PostponeDialog
+          booking={{ id: b.id, bookingNo: b.bookingNo, eventDate: b.eventDate, slotKind: b.slotKind }}
+          credit={{ mode: data.creditMode, methods: data.methods }}
+          onClose={() => setPostponing(false)}
+          onDone={() => {
+            setPostponing(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {cancelling && (
+        <CancelDialog
+          booking={{ id: b.id, bookingNo: b.bookingNo }}
+          methods={data.methods}
+          canRefund={data.canRefund}
+          onClose={() => setCancelling(false)}
+          onDone={() => {
+            setCancelling(false);
             router.refresh();
           }}
         />
