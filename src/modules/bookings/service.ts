@@ -57,7 +57,7 @@ export function resolveTimes(
   return result.times;
 }
 
-function assertDateWindow(eventDate: string, startsAt: Date, now: Date) {
+export function assertDateWindow(eventDate: string, startsAt: Date, now: Date) {
   const violation = bookingDateViolation(eventDate, startsAt, now);
   if (violation) {
     throw new AppError("BUSINESS_RULE_VIOLATION", violation, {

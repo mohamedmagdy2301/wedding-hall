@@ -260,6 +260,8 @@ export async function voidPayment(deps: ServiceDeps, actor: SessionUser, input: 
     if (!found) throw notFound("paymentNotFound");
     // The booking first, like every payment operation (D-126).
     const booking = await lockBookingForPayment(tx, venueId, found.bookingId);
+    // Q8-03: a cancelled booking is frozen, its receipts included.
+    if (booking.status === "cancelled") throw new AppError("BUSINESS_RULE_VIOLATION", "paymentsOnCancelled");
     const [payment] = await tx
       .select({
         receiptNo: payments.receiptNo,

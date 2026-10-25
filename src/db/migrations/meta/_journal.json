@@ -64,6 +64,13 @@
       "when": 1792877963517,
       "tag": "0008_post_confirmation",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792946991513,
+      "tag": "0009_cancelled_frozen",
+      "breakpoints": true
     }
   ]
 }

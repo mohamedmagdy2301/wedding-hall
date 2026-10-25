@@ -180,3 +180,44 @@ export const updateItemsSchema = z.object({
   credit: creditSchema,
 });
 export type UpdateItemsInput = z.output<typeof updateItemsSchema>;
+
+const cancelReason = z.string().trim().min(3, "cancelReasonInvalid").max(300, "cancelReasonInvalid");
+
+/**
+ * `bookings.cancel` (BR-70..76, Q8-02): the refund as typed (pounds → piasters, zero allowed),
+ * its method when above zero (D-47), and a reason when it differs from the suggested one.
+ */
+export const cancelSchema = z.object({
+  bookingId: id,
+  version,
+  reason: cancelReason,
+  refundAmount: nonNegativePoundsField.default(0),
+  methodId: optionalId,
+  adjustReason: z
+    .union([z.literal(""), z.null(), z.string().trim().min(3, "adjustReasonInvalid").max(300, "adjustReasonInvalid")])
+    .optional()
+    .transform((v) => (typeof v === "string" && v !== "" ? v : null)),
+});
+export type CancelInput = z.output<typeof cancelSchema>;
+
+/** The new slot of a postponement (BR-80): the same space, so no space here (P8-05). */
+const postponeSlot = {
+  bookingId: id,
+  eventDate: dateField,
+  slotKind: z.enum(SLOT_KINDS),
+  startTime: optionalTime,
+  endTime: optionalTime,
+};
+
+export const postponePreviewSchema = z.object(postponeSlot);
+export type PostponePreviewInput = z.output<typeof postponePreviewSchema>;
+
+export const postponeSchema = z.object({
+  ...postponeSlot,
+  version,
+  /** The total after the postponement as previewed, in piasters (like D-124). */
+  expectedTotal: intField(0, MAX_PIASTERS),
+  installments: scheduleSchema.optional(),
+  credit: creditSchema,
+});
+export type PostponeInput = z.output<typeof postponeSchema>;

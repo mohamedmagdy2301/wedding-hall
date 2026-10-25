@@ -5,17 +5,22 @@ import {
   bookingIdSchema,
   bookingListSchema,
   calendarSchema,
+  cancelSchema,
   confirmSchema,
   createConfirmedSchema,
   createTentativeSchema,
   extendTentativeSchema,
+  postponePreviewSchema,
+  postponeSchema,
   previewItemsSchema,
   updateDetailsSchema,
   updateItemsSchema,
   updateTentativeSchema,
 } from "@/modules/bookings/schemas";
 import { previewItems, updateItems } from "@/modules/bookings/amend";
+import { cancelBooking, cancelPreview } from "@/modules/bookings/cancel";
 import { confirmBooking, createConfirmed } from "@/modules/bookings/confirm";
+import { postponeBooking, postponePreview } from "@/modules/bookings/postpone";
 import { createTentative, extendTentative, updateDetails, updateTentative } from "@/modules/bookings/service";
 import {
   createCustomerSchema,
@@ -72,6 +77,28 @@ export const bookingSpecs = {
     schema: updateItemsSchema,
     requires: "bookings.edit",
     handler: (ctx, input) => updateItems(ctx, ctx.actor, input),
+  }),
+  // Phase 8 (BR-70..85). A tentative booking is cancelled by bookings.edit or bookings.cancel,
+  // a confirmed one by bookings.cancel (Q8-05); a refund needs payments.refund too (services).
+  cancelPreview: defineProtected({
+    schema: bookingIdSchema,
+    requires: "authenticated",
+    handler: (ctx, input) => cancelPreview(ctx.db, ctx.actor, input.bookingId, ctx.now),
+  }),
+  cancel: defineProtected({
+    schema: cancelSchema,
+    requires: "authenticated",
+    handler: (ctx, input) => cancelBooking(ctx, ctx.actor, input),
+  }),
+  postponePreview: defineProtected({
+    schema: postponePreviewSchema,
+    requires: "bookings.postpone",
+    handler: (ctx, input) => postponePreview(ctx.db, ctx.actor, input, ctx.now),
+  }),
+  postpone: defineProtected({
+    schema: postponeSchema,
+    requires: "bookings.postpone",
+    handler: (ctx, input) => postponeBooking(ctx, ctx.actor, input),
   }),
   get: defineProtected({
     schema: bookingIdSchema,

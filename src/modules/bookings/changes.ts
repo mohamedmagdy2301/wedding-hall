@@ -54,7 +54,7 @@ export type TotalChange = {
   /** Set when lines were written for this change before its row (deferred keys, D-130). */
   changeId?: string;
   booking: { id: string; bookingNo: string; startsAt: Date };
-  kind: "items" | "guests" | "price_override" | "discount";
+  kind: "items" | "guests" | "price_override" | "discount" | "postpone";
   before: unknown;
   after: unknown;
   totalBefore: number;

@@ -17,7 +17,8 @@ import { runTransaction } from "@/modules/shared/transaction";
 import { assertAllowed } from "@/modules/users-rbac/authorize";
 import { approvedDiscount } from "./changes";
 import { requestedQuantity } from "./repository";
-import { markConfirmed, queueOnSpace } from "./confirm-transition";
+import { markConfirmed } from "./confirm-transition";
+import { queueOnSpace } from "./space-queue";
 import type { BookingInput } from "./schemas";
 import {
   assertActiveSpace,

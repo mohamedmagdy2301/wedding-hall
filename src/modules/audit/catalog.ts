@@ -71,6 +71,8 @@ export const AUDIT_ACTIONS = [
   "discounts.reject",
   "discounts.withdraw",
   "payments.refund",
+  "bookings.postpone",
+  "bookings.cancel",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

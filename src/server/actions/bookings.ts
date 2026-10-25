@@ -42,6 +42,20 @@ export async function updateItemsAction(input: unknown) {
 export async function previewItemsAction(input: unknown) {
   return invoke(bookingSpecs.previewItems, input);
 }
+export async function cancelBookingAction(input: unknown) {
+  return run(invoke(bookingSpecs.cancel, input));
+}
+export async function postponeBookingAction(input: unknown) {
+  return run(invoke(bookingSpecs.postpone, input));
+}
+/** Read-only, called by the cancel dialog when it opens. */
+export async function cancelPreviewAction(input: unknown) {
+  return invoke(bookingSpecs.cancelPreview, input);
+}
+/** Read-only, called live by the postpone dialog. */
+export async function postponePreviewAction(input: unknown) {
+  return invoke(bookingSpecs.postponePreview, input);
+}
 
 /** Read-only, called live by the wizard while it is filled in. */
 export async function checkAvailabilityAction(input: unknown) {
