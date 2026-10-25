@@ -16,11 +16,20 @@ export async function requestMeta(): Promise<RequestMeta> {
 
 let fileStore: FileStore | null | undefined;
 
-/** R2 from the environment, built once per isolate (it holds no connection). */
+/**
+ * R2 from the environment, built once per isolate (it holds no connection). A missing or
+ * incomplete configuration gives `null`: uploads then say storage is not ready, and every
+ * other operation keeps working.
+ */
 export function getFileStore(): FileStore | null {
   if (fileStore === undefined) {
-    const config = fileStoreConfigFrom(process.env);
-    fileStore = config ? createFileStore(config) : null;
+    try {
+      const config = fileStoreConfigFrom(process.env);
+      fileStore = config ? createFileStore(config) : null;
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : "invalid R2 environment");
+      fileStore = null;
+    }
   }
   return fileStore;
 }
