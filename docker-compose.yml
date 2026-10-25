@@ -31,5 +31,19 @@ services:
       postgres:
         condition: service_healthy
 
+  # S3-compatible stand-in for Cloudflare R2 (P9-01): the same aws4fetch code signs uploads
+  # and short-lived links against it. The keys are local-only, not secrets.
+  s3:
+    image: versity/versitygw:v1.9.0
+    command: ["posix", "/data"]
+    environment:
+      ROOT_ACCESS_KEY: local-dev-key
+      ROOT_SECRET_KEY: local-dev-secret
+    ports:
+      - "54331:7070"
+    volumes:
+      - s3data:/data
+
 volumes:
   pgdata:
+  s3data:
