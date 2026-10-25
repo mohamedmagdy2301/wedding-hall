@@ -24,7 +24,7 @@ const bytes = (head: number[], size = 64) => {
 const JPEG = bytes([0xff, 0xd8, 0xff, 0xe0]);
 const PNG = bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const PDF = new TextEncoder().encode("%PDF-1.7\n% signed contract\n");
-const file = (content: Uint8Array, name: string, type = "") => new File([content], name, { type });
+const file = (content: Uint8Array<ArrayBuffer>, name: string, type = "") => new File([content], name, { type });
 
 describe("documents (BR-90, SEC-23, SEC-30)", () => {
   const handle = connectTestDb();
