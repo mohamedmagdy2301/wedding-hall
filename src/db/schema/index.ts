@@ -6,3 +6,5 @@ export * from "./spaces";
 export * from "./catalog";
 export * from "./bookings";
 export * from "./payments";
+export * from "./documents";
+export * from "./expenses";

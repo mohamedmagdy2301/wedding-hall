@@ -71,6 +71,13 @@
       "when": 1792946991513,
       "tag": "0009_cancelled_frozen",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792950744707,
+      "tag": "0010_documents_expenses",
+      "breakpoints": true
     }
   ]
 }
