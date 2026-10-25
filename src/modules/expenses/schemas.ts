@@ -31,15 +31,13 @@ const optionalId = z
   .transform((v) => (typeof v === "string" && v !== "" ? v : null));
 
 const period = { from: dateField, to: dateField };
-const periodRule = [
-  (p: { from: string; to: string }) => p.from <= p.to && p.to <= addYears(p.from, 1),
-  { message: "dateRangeInvalid", path: ["to"] },
-] as const;
+const validPeriod = (p: { from: string; to: string }) => p.from <= p.to && p.to <= addYears(p.from, 1);
+const periodError = { message: "dateRangeInvalid", path: ["to"] };
 
 /** A period of Cairo dates, inclusive, of a year at most. */
-export const periodSchema = z.object(period).refine(...periodRule);
+export const periodSchema = z.object(period).refine(validPeriod, periodError);
 
 export const listExpensesSchema = z
   .object({ ...period, categoryId: optionalId, bookingId: optionalId })
-  .refine(...periodRule);
+  .refine(validPeriod, periodError);
 export type ListExpensesInput = z.output<typeof listExpensesSchema>;
