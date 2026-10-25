@@ -16,7 +16,7 @@
 | `bookings.edit` | تعديل بيانات وبنود الحجز | |
 | `bookings.confirm` | تأكيد حجز مبدئي | |
 | `bookings.postpone` | تأجيل حجز | |
-| `bookings.cancel` | إلغاء حجز | ✔ |
+| `bookings.cancel` | إلغاء حجز (المبدئي يلغيه صاحب `bookings.edit` كمان — D-137) | ✔ |
 | `discounts.request` | طلب خصم | |
 | `discounts.approve` | الموافقة على الخصم/تطبيقه مباشرة | ✔ |
 | `payments.record` | تسجيل تحصيل | |

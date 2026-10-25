@@ -162,7 +162,7 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 
 ### booking_changes
 `id, venue_id, booking_id, kind enum(postpone, items, guests, price_override, discount), before jsonb, after jsonb, total_before, total_after, credit_resolution enum(refund, services) null, created_by, created_at`
-append-only بـ trigger (D-130).
+append-only بـ trigger (D-130). نوع `postpone` قبل/بعد فيه المواعيد والفترة و `basePrice` و `seasonId` (D-139).
 
 `booking_items` بعد التأكيد (D-128): `change_id` (التغيير اللي ضاف السطر)، و `voided_at, voided_by, voided_change_id` (كلهم أو ولا حاجة) للسطر اللي اتشال، ومفيش تعديل في سطر ملغي.
 
@@ -188,7 +188,7 @@ append-only بـ trigger (D-130).
 | note | text null |
 | voided_at, voided_by, void_reason | للإلغاء؛ كلها أو لا شيء |
 
-trigger يمنع حذف الدفعات وأي تعديل غير إلغاء دفعة غير ملغاة (D-125). `paid_at` بتاريخ قديم لصاحب `payments.backdate` فقط (D-118).
+trigger يمنع حذف الدفعات وأي تعديل غير إلغاء دفعة غير ملغاة (D-125). `paid_at` بتاريخ قديم لصاحب `payments.backdate` فقط (D-118). trigger تاني (Migration `0009`) يرفض إضافة أو تعديل أي دفعة لحجز حالته `cancelled` (D-136).
 
 ## 6. المصروفات
 

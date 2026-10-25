@@ -53,9 +53,10 @@ CRUD لـ `spaces` (مع `slots`، و `spaces.upcomingBookings(spaceId)` لتح�
 | `bookings.updateDetails(id, version, eventTypeId, groomName, brideName, notes, customerId)` | edit | بيانات غير مالية لأي حجز غير ملغي |
 | `bookings.previewItems(id, changes)` | edit | قراءة بس: الإجمالي قبل/بعد والسطور والخصم الناتج عن السعر اليدوي والرصيد والجدول بعد الضبط (D-132) |
 | `bookings.updateItems(id, version, expectedTotal, changes{guests, extraGuestUnitPrice?, guestServicePrices[], add[], remove[], quantities[], removeIncluded[], restoreIncluded[]}, overrideReason?, installments?, credit?{resolution, methodId?})` | edit (+ `payments.refund` مع الاسترداد) | BR-40..43، D-92، D-93، D-128؛ `PRICE_CHANGED` لو الأسعار اتغيرت من المعاينة؛ الأقساط تتظبط (D-34، D-121) والرصيد يتسوى (D-131) |
-| `bookings.postpone(id, version, newDate, slotKind, times, creditResolution?)` | postpone | BR-80..85 |
-| `bookings.cancelPreview(id)` | cancel | الأيام، الشريحة، الأساس، المقترح |
-| `bookings.cancel(id, version, refundAmount, methodId?, reason)` | cancel (+ payments.refund إن وُجد استرداد) | BR-70..76؛ `methodId` مطلوب إن كان `refundAmount > 0` (D-47) |
+| `bookings.postponePreview(id, eventDate, slotKind, startTime?, endTime?)` | postpone | قراءة بس: السعر الأساسي قبل/بعد والموسم، الإجمالي قبل/بعد، الرصيد، الأقساط المتجاوزة والجدول المقترح، والتعارضات (D-138) |
+| `bookings.postpone(id, version, expectedTotal, eventDate, slotKind, startTime?, endTime?, installments?, credit?{resolution, methodId?})` | postpone (+ `payments.refund` مع الاسترداد) | BR-80..85، D-138؛ `PRICE_CHANGED` و `CONFLICT_SLOT_TAKEN`؛ `installments` مطلوب لو فيه قسط بعد اليوم الجديد − 1 (BR-84) |
+| `bookings.cancelPreview(id)` | cancel، أو edit للمبدئي (D-137) | الأيام، الشريحة المثبتة، الأساس، صافي المدفوع، المقترح (D-134) |
+| `bookings.cancel(id, version, reason, refundAmount?, methodId?, adjustReason?)` | cancel، أو edit للمبدئي (+ `payments.refund` لو المبلغ > 0) | BR-70..76؛ `methodId` لو المبلغ > 0 (D-47)، و `adjustReason` لو المبلغ ≠ المقترح (D-135)؛ المبدئي من غير مبلغ |
 | `bookings.get`, `bookings.list(filters)` | view | |
 
 ## Discounts
@@ -68,7 +69,7 @@ CRUD لـ `spaces` (مع `slots`، و `spaces.upcomingBookings(spaceId)` لتح�
 `payments.record(bookingId, amount, methodId, paidAt?, note?)` — record (+ `payments.backdate` مع `paidAt` — D-118)؛ النوع يحدده السيرفر (D-126)، ويرجع رقم الإيصال
 `payments.recordDeposit(bookingId, amount, methodId, paidAt?, note?, installments?)` — record؛ عربون بديل بعد إلغاء العربون (D-40)، والجدول يُضبط إن لم يُرسل (D-121)
 `payments.void(paymentId, reason)` — void
-`payments.receipt(paymentId)` — `bookings.view`؛ بيانات الطباعة وقت الإصدار (D-122)
+`payments.receipt(paymentId)` — `bookings.view`؛ بيانات الطباعة وقت الإصدار (D-122)، وإيصال الإلغاء من غير متبقي (D-140)
 `payments.refund(bookingId, amount, methodId, reason)` — refund؛ حتى رصيد العميل، وتحت سياسة `services` بعد نهاية الحفلة (D-131)
 `installments.set(bookingId, version, installments[{dueDate, amount}])` — record
 `collections.list(from, to)` — record (D-123)
