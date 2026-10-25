@@ -1,8 +1,10 @@
 import { addDays, cairoDate } from "../src/lib/time";
 import type { SessionUser } from "../src/modules/auth/sessions";
 import { previewItems, updateItems } from "../src/modules/bookings/amend";
+import { cancelBooking, cancelPreview } from "../src/modules/bookings/cancel";
 import { confirmBooking } from "../src/modules/bookings/confirm";
 import { insertDiscount } from "../src/modules/discounts/service";
+import { postponeBooking, postponePreview } from "../src/modules/bookings/postpone";
 import { createTentative } from "../src/modules/bookings/service";
 import { createService, type ServiceInput } from "../src/modules/catalog/services";
 import { createPackage, type PackageFields } from "../src/modules/packages/service";
@@ -24,7 +26,9 @@ import { fail, scriptDeps } from "./lib/services";
  * the guided setup (S-14) from scratch.
  * Phase 5 adds demo tentative bookings (one expired, two on the same slot, two customers
  * with one number — D-28); phase 6 two confirmed ones with their deposit, one with a
- * schedule whose first installment is overdue (P6-12), through bookings.confirm.
+ * schedule whose first installment is overdue (P6-12), through bookings.confirm. Phase 7 a
+ * guest change and a pending discount; phase 8 a booking postponed into the summer season and
+ * one cancelled with the refund its tiers suggest (P8-10).
  */
 async function seedDemoSettings(deps: ServiceDeps, owner: SessionUser) {
   await updateVenue(deps, owner, { name: "قاعة تجريبية", phone: "0221234567", address: "مدينة نصر، القاهرة" });
@@ -169,6 +173,58 @@ async function seedDemoConfirmed(
       approved: false,
     }),
   );
+
+  // Phase 8 (P8-10): postponed into the summer season when it is ahead, and cancelled with its suggested refund.
+  const moved = await confirmed(
+    {
+      spaceId: spaces.big,
+      eventDate: addDays(today, 30),
+      slotKind: "evening",
+      packageId: packages["الباكيج الفضي"],
+      guests: 250,
+    },
+    { name: "كريم عادل", phone: "01009990011" },
+    { groomName: "كريم", brideName: "ياسمين", eventType: "فرح" },
+    () => [],
+  );
+  const seasons = await deps.db.query.seasons.findMany({ columns: { name: true, startDate: true } });
+  const summer = seasons.find((x) => x.name.startsWith("الصيف") && x.startDate > addDays(today, 31));
+  const target = {
+    bookingId: moved.id,
+    eventDate: summer ? addDays(summer.startDate, 14) : addDays(today, 90),
+    slotKind: "evening" as const,
+    startTime: null,
+    endTime: null,
+  };
+  const postponed = await postponePreview(deps.db, owner, target, deps.now);
+  await postponeBooking(deps, owner, {
+    ...target,
+    version: postponed.version,
+    expectedTotal: postponed.totalAfter,
+    credit: null,
+  });
+  const dropped = await confirmed(
+    {
+      spaceId: spaces.small,
+      eventDate: addDays(today, 100),
+      slotKind: "evening",
+      packageId: packages["باكيج الخطوبة"],
+      guests: 100,
+    },
+    { name: "سلمى رأفت", phone: "01224445566" },
+    { groomName: null, brideName: null, eventType: "خطوبة" },
+    () => [],
+  );
+  const quote = await cancelPreview(deps.db, owner, dropped.id, deps.now);
+  const suggested = quote.status === "confirmed" ? quote.suggested : 0;
+  await cancelBooking(deps, owner, {
+    bookingId: dropped.id,
+    version: quote.version,
+    reason: "العميل غيّر الميعاد لمكان تاني (تجريبي)",
+    refundAmount: suggested,
+    methodId: suggested > 0 ? method.id : null,
+    adjustReason: null,
+  });
 }
 
 /** Tentative bookings through the same service as the wizard, dated from today. */
