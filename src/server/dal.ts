@@ -33,6 +33,13 @@ import { listRoles } from "@/modules/users-rbac/roles";
 import { listUsers } from "@/modules/users-rbac/users";
 import { AppError } from "@/modules/shared/errors";
 import { id as uuidField } from "@/modules/shared/fields";
+import { listDocuments } from "@/modules/documents/service";
+import { bookingExpenses, expenseCategoryOptions, listExpenses, periodProfit } from "@/modules/expenses/queries";
+import { listExpensesSchema, type ListExpensesInput } from "@/modules/expenses/schemas";
+import { addDays, cairoDate } from "@/lib/time";
+import { getBookingPrint } from "@/modules/printing/queries";
+import { venueLogoUrl } from "@/modules/settings/logo";
+import { getFileStore } from "./request";
 import { readSessionToken } from "./session-cookie";
 
 /**
@@ -102,7 +109,8 @@ export async function getAuditPageData(filters: AuditFilters) {
 /** S-13 tabs. Each checks its own permission (D-66: spaces and seasons are `catalog.manage`). */
 export async function getVenueSettingsPageData() {
   const actor = await requireAccess("settings.manage");
-  return getVenueSettings(getDb(), actor);
+  const [settings, logoUrl] = await Promise.all([getVenueSettings(getDb(), actor), printLogo(actor.venueId)]);
+  return { ...settings, logoUrl };
 }
 
 export async function getSpacesPageData() {
@@ -208,14 +216,19 @@ export async function getBookingPageData(bookingId: string) {
   const canEdit = satisfies(actor, "bookings.edit");
   const { booking } = data;
   const amendable = canEdit && booking.status === "confirmed" && booking.packageId !== null;
-  const [timing, paymentOptions, discounts, policies, methods, amendOptions] = await Promise.all([
-    getTiming(db, actor.venueId),
-    canRecord ? getPaymentFormOptions(db, actor) : null,
-    bookingDiscounts(db, actor.venueId, booking.id),
-    readVenuePolicies(db, actor.venueId),
-    activePaymentMethods(db, actor.venueId),
-    amendable ? getAmendOptions(db, actor, booking.packageId!) : null,
-  ]);
+  const canRecordExpense = satisfies(actor, "expenses.record");
+  const [timing, paymentOptions, discounts, policies, methods, amendOptions, documents, expenses, categories] =
+    await Promise.all([
+      getTiming(db, actor.venueId),
+      canRecord ? getPaymentFormOptions(db, actor) : null,
+      bookingDiscounts(db, actor.venueId, booking.id),
+      readVenuePolicies(db, actor.venueId),
+      activePaymentMethods(db, actor.venueId),
+      amendable ? getAmendOptions(db, actor, booking.packageId!) : null,
+      listDocuments(db, actor, booking.id),
+      bookingExpenses(db, actor, booking.id),
+      canRecordExpense ? expenseCategoryOptions(db, actor) : null,
+    ]);
   return {
     ...data,
     canEdit,
@@ -235,6 +248,13 @@ export async function getBookingPageData(bookingId: string) {
     creditMode: policies.postponeCreditMode,
     methods,
     amendOptions,
+    // Phases 9 and 10 (BR-90, D-50, Q9-02, Q10-03).
+    documents,
+    canUpload: satisfies(actor, "documents.upload"),
+    expenses,
+    expenseCategories: categories,
+    canVoidExpense: satisfies(actor, "expenses.void"),
+    today: cairoDate(new Date()),
   };
 }
 
@@ -289,8 +309,59 @@ export async function getCollectionsPageData(filters: CollectionsFilters) {
   return { ...result, paymentOptions };
 }
 
-/** P-03 / P-04 (`bookings.view`): the receipt as of its issuance (D-122). */
+/**
+ * S-11 (`expenses.view`, Q10-03): the filtered expenses, the categories, and the period's net
+ * profit for `reports.financial`. The period defaults to the current Cairo month; filters from
+ * the URL are validated (SEC-20) and an invalid set falls back to the defaults.
+ */
+export async function getExpensesPageData(raw: { from?: string; to?: string; categoryId?: string }) {
+  const actor = await requireAccess("expenses.view");
+  const db = getDb();
+  const today = cairoDate(new Date());
+  const month = today.slice(0, 7);
+  const nextMonth = addDays(`${month}-28`, 4).slice(0, 7);
+  const defaults = { from: `${month}-01`, to: addDays(`${nextMonth}-01`, -1) };
+  const parsed = listExpensesSchema.safeParse({
+    from: raw.from || defaults.from,
+    to: raw.to || defaults.to,
+    categoryId: raw.categoryId,
+  });
+  const filters: ListExpensesInput = parsed.success ? parsed.data : { ...defaults, categoryId: null, bookingId: null };
+  const [list, categories, summary] = await Promise.all([
+    listExpenses(db, actor, filters),
+    expenseCategoryOptions(db, actor),
+    satisfies(actor, "reports.financial") ? periodProfit(db, actor, filters) : null,
+  ]);
+  return {
+    ...list,
+    filters,
+    categories,
+    summary,
+    today,
+    canRecord: satisfies(actor, "expenses.record"),
+    canVoid: satisfies(actor, "expenses.void"),
+  };
+}
+
+/** The venue's logo for a printout (D-70): a link signed for a few minutes, or `null`. */
+const printLogo = (venueId: string) => venueLogoUrl({ db: getDb(), files: getFileStore() }, venueId);
+
+/** P-03 / P-04 (`bookings.view`): the receipt as of its issuance (D-122), with the logo. */
 export async function getReceiptPageData(paymentId: string) {
   const actor = await requireAccess("bookings.view");
-  return orNotFound(paymentId, () => getReceipt(getDb(), actor, paymentId));
+  const [receipt, logoUrl] = await Promise.all([
+    orNotFound(paymentId, () => getReceipt(getDb(), actor, paymentId)),
+    printLogo(actor.venueId),
+  ]);
+  return { ...receipt, logoUrl };
+}
+
+/** P-01 / P-02 (`bookings.view`): the booking, the venue and the policy fixed with it (D-68). */
+export async function getBookingPrintData(bookingId: string) {
+  const actor = await requireAccess("bookings.view");
+  const [data, logoUrl] = await Promise.all([
+    orNotFound(bookingId, () => getBookingPrint(getDb(), actor, bookingId, new Date())),
+    printLogo(actor.venueId),
+  ]);
+  return { ...data, logoUrl };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Printer } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -21,10 +21,15 @@ import type { PaymentFormOptions } from "@/modules/payments/queries";
 import { confirmBookingAction, extendTentativeAction } from "@/server/actions/bookings";
 import type { CreditMode } from "@/components/discounts/credit-choice";
 import { DiscountsSection, type DiscountRow } from "@/components/discounts/discounts-section";
+import { DocumentsPanel } from "@/components/documents/documents-panel";
+import { BookingExpensesSection } from "@/components/expenses/booking-expenses";
+import type { CategoryOption } from "@/components/expenses/expense-dialogs";
+import type { BookingDocument } from "@/modules/documents/service";
+import type { BookingExpenses } from "@/modules/expenses/queries";
 import { AmendDialog, type AmendLine, type AmendOptions } from "./amend-dialog";
 import { CancelDialog } from "./cancel-dialog";
 import { PostponeDialog } from "./postpone-dialog";
-import { PriceBreakdownView, type BreakdownView } from "./price-breakdown";
+import { breakdownOf, PriceBreakdownView, type BreakdownView } from "./price-breakdown";
 import { StatusBadge } from "./status-badge";
 
 const tp = t.bookings.page;
@@ -95,6 +100,12 @@ export type BookingViewData = {
   creditMode: CreditMode;
   methods: { id: string; name: string }[];
   amendOptions: AmendOptions | null;
+  documents: BookingDocument[];
+  canUpload: boolean;
+  expenses: BookingExpenses | null;
+  expenseCategories: CategoryOption[] | null;
+  canVoidExpense: boolean;
+  today: string;
 };
 
 function show(field: string, value: unknown): string {
@@ -120,29 +131,7 @@ export function BookingView({ data }: { data: BookingViewData }) {
   // BR-76, BR-80: a confirmed party that is over is neither postponed nor cancelled.
   const upcoming = b.status === "confirmed" && b.displayStatus !== "completed";
 
-  const breakdown: BreakdownView | null =
-    b.total === null
-      ? null
-      : {
-          basePrice: b.basePrice ?? 0,
-          seasonal: b.seasonName !== null,
-          // The snapshot's extra guests (BR-37); guests added after confirmation are lines (D-92).
-          extraGuests:
-            b.extraGuestPrice && b.extraGuestsAmount
-              ? Math.round(b.extraGuestsAmount / b.extraGuestPrice)
-              : b.guests !== null && b.baseGuests !== null && !b.extraGuestPrice
-                ? Math.max(0, b.guests - b.baseGuests)
-                : 0,
-          extraGuestPrice: b.extraGuestPrice ?? 0,
-          extraGuestsAmount: b.extraGuestsAmount ?? 0,
-          lines: data.lines,
-          itemsTotal: b.itemsTotal ?? 0,
-          externalFeesTotal: data.lines.filter((l) => l.isExternal).reduce((sum, l) => sum + l.externalFee, 0),
-          removalCreditsTotal: b.removalCreditsTotal ?? 0,
-          subtotal: b.total + (b.discountAmount ?? 0),
-          discountAmount: b.discountAmount ?? 0,
-          total: b.total,
-        };
+  const breakdown = breakdownOf(b, data.lines);
 
   return (
     <section className="grid gap-4">
@@ -154,7 +143,21 @@ export function BookingView({ data }: { data: BookingViewData }) {
           status={b.displayStatus}
           owing={b.displayStatus === "completed" && data.money.ledger.remaining > 0}
         />
-        <div className="ms-auto flex gap-2">
+        <div className="ms-auto flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/print/bookings/${b.id}/details`} data-testid="print-details">
+              <Printer />
+              {tp.printDetails}
+            </Link>
+          </Button>
+          {b.status !== "tentative" && (
+            <Button asChild variant="outline">
+              <Link href={`/print/bookings/${b.id}/contract`} data-testid="print-contract">
+                <Printer />
+                {tp.printContract}
+              </Link>
+            </Button>
+          )}
           {isTentative && data.canConfirm && data.paymentOptions && (
             <Button onClick={() => setConfirming(true)} data-testid="confirm-booking">
               {tp.confirm}
@@ -253,6 +256,9 @@ export function BookingView({ data }: { data: BookingViewData }) {
           <TabsTrigger value="payments" data-testid="tab-payments">
             {tp.tabs.payments}
           </TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">
+            {tp.tabs.documents}
+          </TabsTrigger>
           <TabsTrigger value="history">{tp.tabs.history}</TabsTrigger>
         </TabsList>
         <TabsContent value="summary">
@@ -286,6 +292,15 @@ export function BookingView({ data }: { data: BookingViewData }) {
               </dl>
             </CardContent>
           </Card>
+          {data.expenses && (
+            <BookingExpensesSection
+              booking={{ bookingNo: b.bookingNo }}
+              expenses={data.expenses}
+              categories={data.expenseCategories}
+              canVoid={data.canVoidExpense}
+              today={data.today}
+            />
+          )}
         </TabsContent>
         <TabsContent value="items">
           <Card className="py-4">
@@ -325,6 +340,13 @@ export function BookingView({ data }: { data: BookingViewData }) {
                 ? { methods: data.methods, creditMode: data.creditMode, ended: b.endsAt < new Date() }
                 : null
             }
+          />
+        </TabsContent>
+        <TabsContent value="documents">
+          <DocumentsPanel
+            booking={{ id: b.id, bookingNo: b.bookingNo }}
+            documents={data.documents}
+            canUpload={data.canUpload}
           />
         </TabsContent>
         <TabsContent value="history">

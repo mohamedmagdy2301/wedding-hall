@@ -29,6 +29,7 @@ const NAV: NavItem[] = [
   { href: "/customers", label: t.shell.customers, permissions: ["bookings.view"] },
   { href: "/collections", label: t.shell.collections, permissions: ["payments.record"] },
   { href: "/approvals", label: t.shell.approvals, permissions: ["discounts.approve"] },
+  { href: "/expenses", label: t.shell.expenses, permissions: ["expenses.view"] },
   { href: "/settings", label: t.shell.settings, permissions: ["settings.manage", "catalog.manage"] },
   { href: "/staff", label: t.shell.staff, permissions: ["users.manage"] },
   { href: "/audit", label: t.shell.audit, permissions: ["audit.view"] },

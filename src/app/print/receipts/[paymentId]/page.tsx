@@ -5,13 +5,14 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatCairoDateTime, formatIsoDate } from "@/lib/time";
 import { getReceiptPageData } from "@/server/dal";
+import { VenueHeading } from "@/components/printing/print-frame";
 
 const tr = t.payments.receipt;
 
 /**
  * P-03 (A4) and P-04 (80 mm thermal) — printed by the browser, no library (CLAUDE.md rule
  * 10, D-127). Paid and remaining are as of the receipt's issuance (D-122); a voided receipt
- * prints with its reason. The venue's logo comes with phase 9 (D-70).
+ * prints with its reason, under the venue's logo (D-70).
  */
 export default async function ReceiptPage({ params, searchParams }: PageProps<"/print/receipts/[paymentId]">) {
   const { paymentId } = await params;
@@ -63,12 +64,12 @@ export default async function ReceiptPage({ params, searchParams }: PageProps<"/
         </Link>
       </div>
       <article data-testid="receipt" data-size={size} className="grid gap-3 break-inside-avoid">
-        <header className="grid gap-0.5 border-b border-black pb-2 text-center">
-          <h1 className={cn("font-bold", thermal ? "text-[15px]" : "text-xl")}>{r.venueName}</h1>
-          {r.venuePhone && <p dir="ltr">{r.venuePhone}</p>}
-          {r.venueAddress && <p>{r.venueAddress}</p>}
-          <p className="mt-1 font-medium">{tr.title}</p>
-        </header>
+        <VenueHeading
+          venue={{ name: r.venueName, phone: r.venuePhone, address: r.venueAddress }}
+          logoUrl={r.logoUrl}
+          title={tr.title}
+          compact={thermal}
+        />
         {r.voidedAt && (
           <p className="border-2 border-black p-1 text-center font-bold" data-testid="receipt-voided">
             {tr.voided} — {tr.voidReason}: {r.voidReason}

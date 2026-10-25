@@ -72,7 +72,8 @@ function assertMayCancel(actor: SessionUser, booking: CancelBookingRow, now: Dat
 }
 
 /** The snapshot's tiers as stored (D-68): `[{min_days_before, refund_bps}]`. */
-const snapshotTiers = (stored: unknown): CancellationTier[] =>
+/** The tiers stored with the booking at confirmation (D-68), as the domain reads them. */
+export const snapshotTiers = (stored: unknown): CancellationTier[] =>
   ((stored ?? []) as { min_days_before: number; refund_bps: number }[]).map((t) => ({
     minDaysBefore: t.min_days_before,
     refundBps: t.refund_bps,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   refundsNothing,
   tierFor,
+  tierRanges,
   tierViolation,
   tiersConfigured,
   type CancellationTier,
@@ -346,5 +347,31 @@ describe("guided setup checklist (UF-02, D-71)", () => {
       "cancellationTiers",
     ]);
     expect(bookingReadinessGaps({ activeSpaces: 2, pricedPackages: 1, cancellationTiers: 1 })).toEqual([]);
+  });
+});
+
+describe("cancellation tiers as the contract states them (P-02, D-68)", () => {
+  it("90 → 75%, 30 → 50%, 0 → 0%: 90+, 30–89, 0–29", () => {
+    expect(
+      tierRanges([
+        { minDaysBefore: 30, refundBps: 5000 },
+        { minDaysBefore: 0, refundBps: 0 },
+        { minDaysBefore: 90, refundBps: 7500 },
+      ]),
+    ).toEqual([
+      { fromDays: 90, toDays: null, refundBps: 7500 },
+      { fromDays: 30, toDays: 89, refundBps: 5000 },
+      { fromDays: 0, toDays: 29, refundBps: 0 },
+    ]);
+  });
+
+  it("without a 0-day tier the days below the shortest refund nothing; one 0-day tier covers all", () => {
+    expect(tierRanges([{ minDaysBefore: 14, refundBps: 10000 }])).toEqual([
+      { fromDays: 14, toDays: null, refundBps: 10000 },
+      { fromDays: 0, toDays: 13, refundBps: 0 },
+    ]);
+    expect(tierRanges([{ minDaysBefore: 0, refundBps: 2500 }])).toEqual([
+      { fromDays: 0, toDays: null, refundBps: 2500 },
+    ]);
   });
 });

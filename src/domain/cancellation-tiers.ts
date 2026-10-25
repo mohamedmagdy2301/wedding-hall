@@ -52,3 +52,22 @@ export function tierFor(tiers: readonly CancellationTier[], daysRemaining: numbe
   }
   return match;
 }
+
+/**
+ * The tiers as the contract states them (P-02, D-68), longest notice first: each tier covers
+ * from its days up to the day before the next longer one (`toDays` is `null` for the longest).
+ * Below the shortest tier nothing is refunded (no tier applies), so that range is added with 0.
+ */
+export function tierRanges(tiers: readonly CancellationTier[]) {
+  const sorted = sortTiers(tiers).reverse();
+  const ranges: { fromDays: number; toDays: number | null; refundBps: number }[] = sorted.map((tier, i) => ({
+    fromDays: tier.minDaysBefore,
+    toDays: i === 0 ? null : sorted[i - 1].minDaysBefore - 1,
+    refundBps: tier.refundBps,
+  }));
+  const shortest = sorted.at(-1);
+  if (shortest && shortest.minDaysBefore > 0) {
+    ranges.push({ fromDays: 0, toDays: shortest.minDaysBefore - 1, refundBps: 0 });
+  }
+  return ranges;
+}

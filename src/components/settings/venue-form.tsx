@@ -9,7 +9,7 @@ import { useSavedNote } from "./saved-note";
 
 type Props = { name: string; phone: string | null; address: string | null };
 
-/** S-13 "بيانات المنشأة". The logo comes in phase 9 (D-70). */
+/** S-13 "بيانات المنشأة"; the logo has its own panel (D-70). */
 export function VenueForm(props: Props) {
   const { run, pending, error } = useServerAction(updateVenueAction);
   const saved = useSavedNote();
@@ -40,7 +40,6 @@ export function VenueForm(props: Props) {
         defaultValue={props.address ?? ""}
         error={error?.fieldErrors?.address}
       />
-      <p className="text-xs text-muted-foreground">{t.settings.venue.logoLater}</p>
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? t.common.saving : t.common.save}

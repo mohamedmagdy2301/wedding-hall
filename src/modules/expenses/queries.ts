@@ -5,6 +5,7 @@ import { profit, sumExpenses } from "@/domain/expenses";
 import { addDays, cairoInstant } from "@/lib/time";
 import type { SessionUser } from "@/modules/auth/sessions";
 import type { DbOrTx } from "@/modules/shared/db";
+import { forbidden } from "@/modules/shared/errors";
 import { assertAllowed, satisfies } from "@/modules/users-rbac/authorize";
 import type { ListExpensesInput } from "./schemas";
 
@@ -141,9 +142,9 @@ export async function bookingExpenses(
   return { rows, total: totalOf(rows), net };
 }
 
-/** The active categories for the add form; the filter lists inactive ones too. */
+/** The categories for the add form (active ones) and the S-11 filter (all of them). */
 export async function expenseCategoryOptions(db: DbOrTx, actor: SessionUser) {
-  assertAllowed(actor, "expenses.view");
+  if (!satisfies(actor, "expenses.view") && !satisfies(actor, "expenses.record")) throw forbidden();
   return db
     .select({ id: expenseCategories.id, name: expenseCategories.name, isActive: expenseCategories.isActive })
     .from(expenseCategories)

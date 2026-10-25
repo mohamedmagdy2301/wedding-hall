@@ -24,6 +24,45 @@ export type BreakdownView = {
   total: number;
 };
 
+/** The stored snapshot of a booking as a breakdown (S-07, P-01, P-02); `null` without a price. */
+export function breakdownOf(
+  b: {
+    total: number | null;
+    basePrice: number | null;
+    seasonName: string | null;
+    guests: number | null;
+    baseGuests: number | null;
+    extraGuestPrice: number | null;
+    extraGuestsAmount: number | null;
+    itemsTotal: number | null;
+    removalCreditsTotal: number | null;
+    discountAmount: number | null;
+  },
+  lines: (BreakdownView["lines"][number] & { externalFee: number })[],
+): BreakdownView | null {
+  if (b.total === null) return null;
+  return {
+    basePrice: b.basePrice ?? 0,
+    seasonal: b.seasonName !== null,
+    // The snapshot's extra guests (BR-37); guests added after confirmation are lines (D-92).
+    extraGuests:
+      b.extraGuestPrice && b.extraGuestsAmount
+        ? Math.round(b.extraGuestsAmount / b.extraGuestPrice)
+        : b.guests !== null && b.baseGuests !== null && !b.extraGuestPrice
+          ? Math.max(0, b.guests - b.baseGuests)
+          : 0,
+    extraGuestPrice: b.extraGuestPrice ?? 0,
+    extraGuestsAmount: b.extraGuestsAmount ?? 0,
+    lines,
+    itemsTotal: b.itemsTotal ?? 0,
+    externalFeesTotal: lines.filter((l) => l.isExternal).reduce((sum, l) => sum + l.externalFee, 0),
+    removalCreditsTotal: b.removalCreditsTotal ?? 0,
+    subtotal: b.total + (b.discountAmount ?? 0),
+    discountAmount: b.discountAmount ?? 0,
+    total: b.total,
+  };
+}
+
 function Row({ label, amount, muted, strong }: { label: string; amount: number; muted?: boolean; strong?: boolean }) {
   return (
     <div

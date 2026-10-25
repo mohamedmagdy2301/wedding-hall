@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "*": ["node_modules/**/*.wasm", "node_modules/next/dist/compiled/@vercel/og/**"],
   },
+  experimental: {
+    // Documents go up to 5 MB (SEC-23); the service checks the exact limit from the bytes.
+    serverActions: { bodySizeLimit: "6mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {
