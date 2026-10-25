@@ -1,15 +1,18 @@
 import type { Db } from "@/db/client";
+import type { FileStore } from "@/lib/r2";
 import type { PasswordHasher } from "@/modules/auth/password/hasher";
 
 /**
  * What every service call gets from its caller (the action wrapper, a script or a test):
  * the connection, the password hasher, and the clock — injected so lockout and session
- * expiry can be tested without waiting.
+ * expiry can be tested without waiting. `files` is R2 (phase 9): only the document and logo
+ * services use it, and `null` means the venue has no bucket configured yet.
  */
 export type ServiceDeps = {
   db: Db;
   hasher: PasswordHasher;
   now: Date;
+  files?: FileStore | null;
 };
 
 /** Client details recorded with login events (P1-07). */

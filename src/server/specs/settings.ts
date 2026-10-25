@@ -18,6 +18,9 @@ import {
   updateTimingSchema,
   updateVenueSchema,
 } from "@/modules/settings/schemas";
+import { z } from "zod";
+import { setLogoSchema } from "@/modules/documents/schemas";
+import { removeLogo, setLogo } from "@/modules/settings/logo";
 import { createSeason, setSeasonActive, updateSeason } from "@/modules/settings/seasons";
 import { updatePolicies, updateTiming, updateVenue } from "@/modules/settings/venue";
 import { AppError } from "@/modules/shared/errors";
@@ -63,6 +66,16 @@ export const settingsSpecs = {
       if (input.kind === "expenseCategories") throw new AppError("VALIDATION_ERROR", "validation");
       return moveListItem(ctx, ctx.actor, { ...input, kind: input.kind });
     },
+  }),
+  setLogo: defineProtected({
+    schema: setLogoSchema,
+    requires: "settings.manage",
+    handler: (ctx, input) => setLogo(ctx, ctx.actor, input),
+  }),
+  removeLogo: defineProtected({
+    schema: z.object({}),
+    requires: "settings.manage",
+    handler: (ctx) => removeLogo(ctx, ctx.actor),
   }),
   addSuggestedItems: defineProtected({
     schema: listKindSchema,

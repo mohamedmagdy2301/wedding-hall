@@ -18,6 +18,12 @@ async function run<R>(result: Promise<ActionResult<R>>): Promise<ActionResult<R>
 export async function updateVenueAction(input: unknown) {
   return run(invoke(settingsSpecs.updateVenue, input));
 }
+export async function setLogoAction(input: unknown) {
+  return run(invoke(settingsSpecs.setLogo, input));
+}
+export async function removeLogoAction() {
+  return run(invoke(settingsSpecs.removeLogo, {}));
+}
 export async function updateTimingAction(input: unknown) {
   return run(invoke(settingsSpecs.updateTiming, input));
 }

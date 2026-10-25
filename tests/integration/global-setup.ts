@@ -1,5 +1,6 @@
 import { Client } from "pg";
 import type { TestProject } from "vitest/node";
+import { ensureLocalBucket } from "../../src/lib/r2";
 import { runMigrations } from "../../scripts/migrate";
 
 const DEFAULT_ADMIN_URL = "postgres://postgres:postgres@localhost:54329/postgres";
@@ -59,6 +60,8 @@ export const workerDatabaseName = (poolId: number | string) => `${TEST_DB_NAME}_
  */
 export default async function setup(project: TestProject) {
   const target = await resolveTarget();
+  // Documents and the logo go to the local R2 stand-in, on Neon runs too (phase 9).
+  await ensureLocalBucket();
   const workers = target.perWorker ? project.config.maxWorkers : 0;
   const dropAll = async (admin: Client) => {
     for (let i = 1; i <= workers; i += 1) {

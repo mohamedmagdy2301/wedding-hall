@@ -73,6 +73,13 @@ export const AUDIT_ACTIONS = [
   "payments.refund",
   "bookings.postpone",
   "bookings.cancel",
+  "documents.upload",
+  "documents.view",
+  "documents.remove",
+  "settings.logo_updated",
+  "settings.logo_removed",
+  "expenses.create",
+  "expenses.void",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -93,5 +100,7 @@ export const AUDIT_ENTITY_TYPES = [
   "booking",
   "payment",
   "discount_request",
+  "document",
+  "expense",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

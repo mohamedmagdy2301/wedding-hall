@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import type { DbHandle } from "@/db/client";
 import { auditLogs, roles } from "@/db/schema";
+import { createFileStore, LOCAL_FILE_STORE } from "@/lib/r2";
 import { createPasswordHasher } from "@/modules/auth/password/hasher";
 import { loadArgon2ModuleFromDisk } from "@/modules/auth/password/wasm-node";
 import { changePassword, login } from "@/modules/auth/service";
@@ -19,11 +20,14 @@ export const testHasher = createPasswordHasher(loadArgon2ModuleFromDisk(), {
   parallelism: 1,
 });
 
+/** The local R2 stand-in (versitygw in docker compose); the bucket is made by global-setup. */
+export const testFiles = createFileStore(LOCAL_FILE_STORE);
+
 export const OWNER = { login: "owner", tempPassword: "temp-owner-1", password: "owner-password-1" };
 export const META = { ip: "203.0.113.7", userAgent: "vitest" };
 
 export function depsAt(handle: DbHandle, now = new Date()): ServiceDeps {
-  return { db: handle.db, hasher: testHasher, now };
+  return { db: handle.db, hasher: testHasher, now, files: testFiles };
 }
 
 export type Signed = { token: string; actor: SessionUser };
